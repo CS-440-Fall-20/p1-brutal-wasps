@@ -12,8 +12,8 @@ var points1 = [];
 var colors = [];
 var modelViewMatrix = mat4();
 var projectionMatrix = mat4();
-var theta = 45;
-var phi = 45;
+var theta = 5;
+var phi = 5;
 var radius = 0.05;
 const at = vec3(0.0, 0.0, 0.0);
 const up = vec3(0.0, 1.0, 0.0);
@@ -29,6 +29,9 @@ var far = 1;
 // camera movement speed
 var speed = 0.05;
 
+var modelViewMatrixLoc;
+var projectionMatrixLoc;
+
 // get key press event listener 
 document.addEventListener('keypress', getKeyPress);
 
@@ -41,7 +44,7 @@ uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
 void main()
 {
-    gl_Position = /*projectionMatrix **/ modelViewMatrix * vertexPosition;
+    gl_Position = projectionMatrix * modelViewMatrix * vertexPosition;
     color = vec4(1.0, 1.0, 1.0, 1.0);
 }
 `
@@ -82,15 +85,16 @@ window.onload = function init()
     eye = vec3(radius*Math.sin(theta)*Math.cos(phi),
                 radius*Math.sin(theta)*Math.sin(phi),
                 radius*Math.cos(theta));
+    //eye = vec3(0.5, 0.7, 0.5);
 
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
-    var projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
+    projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
     
 	//modelViewMatrix = lookAt(eye, at , up);
-    projectionMatrix = ortho(left, right, bottom, ytop, near, far);
+    //projectionMatrix = ortho(left, right, bottom, ytop, near, far);
 
     //gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
-    gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
+    //gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
@@ -170,15 +174,12 @@ function animate(time)
 
     modelViewMatrix = ortho(left, right, bottom, ytop, near, far);
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
+    
+    projectionMatrix = lookAt(eye, at , up);
+    gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
     gl.drawArrays( gl.LINES, 0, points.length );
 
-    //left = left + 0.005;
-    //right = right + 0.005;
-    //ytop = ytop + 0.005;
-    //bottom = bottom + 0.005;
-    //near = near + 0.005;
-	//far = far + 0.005;
     //render();
 
     window.requestAnimationFrame(animate);
@@ -203,10 +204,10 @@ function getKeyPress(event){
     }
     else if (event.code === 'Numpad5'){ // in
         near = near - speed;
-	    far = far - speed;
+        far = far - speed;
     }
     else if (event.code === 'Numpad0'){ // far
         near = near + speed;
-	    far = far + speed;
+        far = far + speed;
     }
 }
