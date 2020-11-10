@@ -8,22 +8,27 @@ var vertexPosition;
 var points = [];
 var colors = [];
 var points1 = [];
+var vertices = [];
 
 var modelViewMatrix = mat4();
 var projectionMatrix = mat4();
-var theta = 5;
-var phi = 5;
-var radius = 0.05;
-const at = vec3(0.0, 0.0, 0.0);
+var theta = 0;
+var phi = 0;
+var radius = 0.0;
+const at = vec3(1, 0.0, 1);
 const up = vec3(0.0, 1.0, 0.0);
 
+const WHITE = vec4(1, 1, 1, 1);
+const BLUE = vec4(0, 0, 1, 1);
+const GREEN = vec4(0, 1, 0, 1);
+const BROWN = vec4(210/255, 105/255, 30/255, 1);
 // adding ortho params that can be altered
-var left = -1.0;
-var right = 1.0;
+var left = -3.0;
+var right = 3.0;
 var ytop = 1.0;
 var bottom = -1.0;
-var near = -1;
-var far = 1;
+var near = -3;
+var far = 3;
 
 // camera movement speed
 var speed = 0.05;
@@ -46,7 +51,7 @@ uniform mat4 modelViewMatrix;
 void main()
 {
     gl_Position = projectionMatrix * modelViewMatrix * vertexPosition;
-    color = vec4(1.0, 1.0, 1.0, 1.0);
+    color = vertexColor;
 }
 `
 
@@ -84,8 +89,8 @@ window.onload = function init()
     gl.enable(gl.DEPTH_TEST);
 
     eye = vec3(radius*Math.sin(theta)*Math.cos(phi),
-                radius*Math.sin(theta)*Math.sin(phi),
-                radius*Math.cos(theta));
+    0.3,
+    radius*Math.cos(theta));
     //eye = ytop;
 
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
@@ -103,10 +108,16 @@ window.onload = function init()
     
     var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
     
-    colorBuffer = gl.createBuffer();
-    
 	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vertexPosition );
+
+    vertexColor = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+
+    var vColor = gl.getAttribLocation(program, "vertexColor");
+    gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vColor);
 
     getPatch(-5, 5, -5, 5);
 
@@ -146,6 +157,7 @@ function createShaderHelper(sourceString, vertex = true)
 
 var scl = 0.1;
 
+noise.seed(Math.random()*65000);
 function getPatch(xmin, xmax, zmin, zmax)
 {
     for (let z = zmin; z < zmax; z += scl)
@@ -161,42 +173,103 @@ function getPatch(xmin, xmax, zmin, zmax)
             points.push(a); points.push(d);
             points.push(b); points.push(d);
             points.push(c); points.push(d);
+            
+            vertices.push(a); vertices.push(b); vertices.push(c);
+            vertices.push(d); vertices.push(b); vertices.push(c);
+            
         }
     }
 	
     for (var k = 0; k < points.length; k++)
-         points[k][1] = noise.perlin2(points[k][0], points[k][2]);
-
-}
+    {
+        points[k][1] = noise.perlin2(points[k][0], points[k][2]);
+        colors.push(vec4(1.0, 1.0, 1.0, 1.0));
+    }
+    console.log(points);
+    console.log(vertices);
+}   
 
 function animate(time)
 {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW );
+    colors = setColors(); // sets the colors array
+    
 
-    modelViewMatrix = ortho(left, right, bottom, ytop, near, far);
+    projectionMatrix = ortho(left, right, bottom, ytop, near, far);
+    modelViewMatrix = lookAt(eye, at , up);
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
     
-    projectionMatrix = lookAt(eye, at , up);
+    
+    
     gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
+    // the variable 'colors' will always have the active shading scheme colors
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+
+    gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     if (fill % 4 === 0){ // wireframe
+        gl.bufferData( gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW );
         gl.drawArrays( gl.LINES, 0, points.length );
     }
     else if (fill  % 4 > 0){ // shading involved
-        colors = setColors();    // sets the colors array
-        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-        // the variable 'colors' will always have the active shading scheme colors
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-        gl.drawArrays( gl.TRIANGLES, 0, points.length );
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
+        gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
     }
 
     window.requestAnimationFrame(animate);
 }
 
+
+function getVertexColor(vertex)
+{
+    if (vertex[1] > 0.6)
+    {
+        color = WHITE;
+    }
+    else if (vertex[1] > 0.33)
+    {
+        color = BROWN;
+        color = mapPoint(0.33, 0.6, vertex[1], BROWN, WHITE)
+    }
+    else if (vertex[1] > 0)
+    {
+        color = GREEN;
+        color = mapPoint(0, 0.33, vertex[1], GREEN, BROWN)
+    }
+    else
+    {
+        color = vec4(0, 0, 1, 1);
+    }
+    return color
+}
+
 function setColors(){
     if (fill % 4 === 1){ // flat shading
+        for (var k = 0; k < vertices.length; k += 3)
+        {
+            var r = 0; var g = 0; var b = 0;
+            
+            for (let i = 0; i < 3; i++)
+            {
+                color = getVertexColor(vertices[k + i]);
+                r += color[0];
+                g += color[1];
+                b += color[2];
+            }
+
+            r = r / 3;
+            g = g / 3;
+            b = b / 3;
+
+            for (let i = 0; i < 3; i++)
+            {
+                colors[k + i] = vec4(r, g, b, 1);
+            }
+
+
+        } 
 
     }
     else if (fill % 4 === 2){ // smooth shading
@@ -204,6 +277,13 @@ function setColors(){
     }   
     else if (fill % 4 == 3){ // Phong shading 
 
+    }
+    else
+    {
+        for (var k = 0; k < points.length; k++)
+        {
+            colors[k] = vec4(1, 1, 1, 1);
+        } 
     }
     return colors;
 }
