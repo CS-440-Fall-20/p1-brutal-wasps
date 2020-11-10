@@ -9,7 +9,6 @@ var points = [];
 var colors = [];
 var points1 = [];
 
-var colors = [];
 var modelViewMatrix = mat4();
 var projectionMatrix = mat4();
 var theta = 5;
@@ -31,6 +30,8 @@ var speed = 0.05;
 
 var modelViewMatrixLoc;
 var projectionMatrixLoc;
+
+var fill = 0;
 
 // get key press event listener 
 document.addEventListener('keypress', getKeyPress);
@@ -85,7 +86,7 @@ window.onload = function init()
     eye = vec3(radius*Math.sin(theta)*Math.cos(phi),
                 radius*Math.sin(theta)*Math.sin(phi),
                 radius*Math.cos(theta));
-    //eye = vec3(0.5, 0.7, 0.5);
+    //eye = ytop;
 
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
     projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
@@ -100,7 +101,9 @@ window.onload = function init()
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferData( gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW );
     
-	var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
+    var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
+    
+    colorBuffer = gl.createBuffer();
     
 	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vertexPosition );
@@ -178,11 +181,31 @@ function animate(time)
     projectionMatrix = lookAt(eye, at , up);
     gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
-    gl.drawArrays( gl.LINES, 0, points.length );
-
-    //render();
+    if (fill % 4 === 0){ // wireframe
+        gl.drawArrays( gl.LINES, 0, points.length );
+    }
+    else if (fill  % 4 > 0){ // shading involved
+        colors = setColors();    // sets the colors array
+        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+        // the variable 'colors' will always have the active shading scheme colors
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+        gl.drawArrays( gl.TRIANGLES, 0, points.length );
+    }
 
     window.requestAnimationFrame(animate);
+}
+
+function setColors(){
+    if (fill % 4 === 1){ // flat shading
+
+    }
+    else if (fill % 4 === 2){ // smooth shading
+
+    }   
+    else if (fill % 4 == 3){ // Phong shading 
+
+    }
+    return colors;
 }
 
 function getKeyPress(event){
@@ -209,5 +232,8 @@ function getKeyPress(event){
     else if (event.code === 'Numpad0'){ // far
         near = near + speed;
         far = far + speed;
+    }
+    else if (event.code === 'KeyV'){ // toggle view
+        fill = fill + 1;
     }
 }
