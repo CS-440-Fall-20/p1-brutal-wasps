@@ -9,9 +9,11 @@ var points = [];
 var colors = [];
 var points1 = [];
 var vertices = [];
+var normals = [];
 
 var modelViewMatrix = mat4();
 var projectionMatrix = mat4();
+var normalMatrix;
 var theta = 0;
 var phi = 0;
 var radius = 0.0;
@@ -114,7 +116,7 @@ window.onload = function init()
 
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW );
+    gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
     
     var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
     
@@ -185,7 +187,8 @@ function getPatch(xmin, xmax, zmin, zmax)
             points.push(c); points.push(d);
             
             vertices.push(a); vertices.push(b); vertices.push(c);
-            vertices.push(d); vertices.push(b); vertices.push(c);
+            vertices.push(c); vertices.push(d); vertices.push(b);
+
             
         }
     }
@@ -194,6 +197,10 @@ function getPatch(xmin, xmax, zmin, zmax)
     {
         points[k][1] = noise.perlin2(points[k][0], points[k][2]);
         colors.push(vec4(1.0, 1.0, 1.0, 1.0));
+    }
+
+    for (var k = 0; k < vertices.length; k ++){
+        normals.push(vec4(vertices[k][0], vertices[k][1], vertices[k][2], 0));
     }
     console.log(points);
     console.log(vertices);
@@ -221,8 +228,9 @@ function animate(time)
 
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     if (fill % 4 === 0){ // wireframe
-        gl.bufferData( gl.ARRAY_BUFFER, flatten(points), gl.STATIC_DRAW );
-        gl.drawArrays( gl.LINES, 0, points.length );
+        gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
+        for( var i=0; i<vertices.length; i+=3)
+            gl.drawArrays( gl.LINE_LOOP, i, 3 );
     }
     else if (fill  % 4 > 0){ // shading involved
         gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
