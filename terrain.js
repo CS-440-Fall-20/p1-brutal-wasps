@@ -15,7 +15,13 @@ var projectionMatrix = mat4();
 var theta = 0;
 var phi = 0;
 var radius = 0.0;
-const at = vec3(1, 0.0, 1);
+
+var x_pos = 0;
+var y_pos = 2;
+var z_pos = -2;
+var diff = 1;
+var mov_speed = 0.01;
+var at = vec3(x_pos, y_pos, 5);
 const up = vec3(0.0, 1.0, 0.0);
 
 const WHITE = vec4(1, 1, 1, 1);
@@ -23,12 +29,14 @@ const BLUE = vec4(0, 0, 1, 1);
 const GREEN = vec4(0, 1, 0, 1);
 const BROWN = vec4(210/255, 105/255, 30/255, 1);
 // adding ortho params that can be altered
-var left = -3.0;
-var right = 3.0;
-var ytop = 1.0;
-var bottom = -1.0;
-var near = -3;
-var far = 3;
+var left = -2.5;
+var right = 2.5;
+var ytop = 0.5;
+var bottom = -3;
+var near = -2.5;
+var far = 2.5;
+
+
 
 // camera movement speed
 var speed = 0.05;
@@ -50,7 +58,9 @@ uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
 void main()
 {
-    gl_Position = projectionMatrix * modelViewMatrix * vertexPosition;
+    vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
+    float divideZ = 1.05 + position.z;
+    gl_Position = vec4(position.xy/divideZ, position.z, 1);
     color = vertexColor;
 }
 `
@@ -88,9 +98,9 @@ window.onload = function init()
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
 
-    eye = vec3(radius*Math.sin(theta)*Math.cos(phi),
-    0.3,
-    radius*Math.cos(theta));
+    eye = vec3(x_pos,
+    y_pos,
+    z_pos - diff);
     //eye = ytop;
 
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
@@ -192,9 +202,10 @@ function getPatch(xmin, xmax, zmin, zmax)
 function animate(time)
 {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    colors = setColors(); // sets the colors array
     
-
+    z_pos += mov_speed;
+    at = vec3(x_pos, y_pos, z_pos);
+    eye = vec3(x_pos, y_pos, z_pos - diff);
     projectionMatrix = ortho(left, right, bottom, ytop, near, far);
     modelViewMatrix = lookAt(eye, at , up);
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
@@ -315,5 +326,6 @@ function getKeyPress(event){
     }
     else if (event.code === 'KeyV'){ // toggle view
         fill = fill + 1;
+        colors = setColors(); // sets the colors array
     }
 }
