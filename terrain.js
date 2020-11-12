@@ -3,13 +3,17 @@ var QUAD_MODE = 1;
 var gl;
 var colorBuffer;
 var vertexBuffer;
+var normalBuffer;
+var ambBuffer;
 var vertexColor;
 var vertexPosition;
+
 var points = [];
 var colors = [];
 var points1 = [];
 var vertices = [];
-var normals = [];
+var vNormals = [];
+var verticesFaces = {};
 
 var modelViewMatrix = mat4();
 var projectionMatrix = mat4();
@@ -17,6 +21,8 @@ var normalMatrix;
 var theta = 0;
 var phi = 0;
 var radius = 0.0;
+var faces = {}
+var faceNum = 0;
 
 var x_pos = 0;
 var y_pos = 2;
@@ -48,6 +54,17 @@ var projectionMatrixLoc;
 
 var fill = 0;
 
+
+var lightPosition = vec4(1, 1, 1, 0.0 );
+var lightAmbient = vec4(0.8, 0.8, 0.8, 1.0 );
+var lightDiffuse = vec4( 1, 1, 1, 1.0 );
+var lightSpecular = vec4( 0.5, 0.5, 0.5, 1.0 );
+
+var materialAmbient = vec4( 1.0, 1.0, 1.0, 1.0 );
+var materialDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
+var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+var materialShininess = 100.0;
+
 // get key press event listener 
 document.addEventListener('keypress', getKeyPress);
 
@@ -55,15 +72,55 @@ document.addEventListener('keypress', getKeyPress);
 var vertexShader = `
 attribute vec4 vertexPosition;
 attribute vec4 vertexColor;
+attribute vec3 vNormal;
 varying vec4 color;
 uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
+
+uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+uniform vec4 lightPosition;
+uniform float shininess;
 void main()
 {
+    //code copy pasted from Anisa's recitation
+
+    vec3 pos = -(modelViewMatrix * vertexPosition).xyz;
+    
+    //fixed light postion
+    
+    vec3 light = lightPosition.xyz;
+    vec3 L = normalize( light - pos );
+
+	
+    vec3 E = normalize( -pos );
+    vec3 H = normalize( L + E );
+    
+    vec4 NN = vec4(vNormal,0);
+
+    // Transform vertex normal into eye coordinates
+       
+    vec3 N = normalize( (modelViewMatrix*NN).xyz);
+
+    // Compute terms in the illumination equation
+    vec4 ambient = ambientProduct;
+
+    float Kd = max( dot(L, N), 0.0 );
+    vec4  diffuse = Kd*diffuseProduct;
+
+    float Ks = pow( max(dot(N, H), 0.0), shininess );
+    vec4  specular = Ks * specularProduct;
+    
+    if( dot(L, N) < 0.0 ) {
+	specular = vec4(0.0, 0.0, 0.0, 1.0);
+    } 
+
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
     float divideZ = 1.05 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
-    color = vertexColor;
+
+    color = ambient + diffuse + specular;
+    color.a = 1.0;
+    color = color * vertexColor;
 }
 `
 
@@ -99,6 +156,7 @@ window.onload = function init()
     gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
+    getPatch(-5, 5, -5, 5);
 
     eye = vec3(x_pos,
     y_pos,
@@ -117,28 +175,55 @@ window.onload = function init()
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
-    
     var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
-    
 	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vertexPosition );
 
+    
     vertexColor = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-
     var vColor = gl.getAttribLocation(program, "vertexColor");
     gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vColor);
+    
 
-    getPatch(-5, 5, -5, 5);
+    //inspired from Anisa recitation
+    normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(vNormals), gl.STATIC_DRAW);
+    var vNormal = gl.getAttribLocation(program, "vNormal");
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    
+
+    var ambientProduct = mult(lightAmbient, materialAmbient);
+    var diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    var specularProduct = mult(lightSpecular, materialSpecular);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
+        flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"),
+        flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"),
+        flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
+        flatten(lightPosition));
+
+    gl.uniform1f(gl.getUniformLocation(program,
+            "shininess"), materialShininess);
 
     //render()
+    console.log(vNormals);
+    setColors();
     animate(0);
 }
 
 function mapPoint(P, Q, X, A, B)
 {
+
+    //Anisa reciation code  
     var alpha = (((Q-P)*(Q-P) > 0 ) ? (X - P)/(Q - P) : 0);
     var result;
     
@@ -187,9 +272,7 @@ function getPatch(xmin, xmax, zmin, zmax)
             points.push(c); points.push(d);
             
             vertices.push(a); vertices.push(b); vertices.push(c);
-            vertices.push(c); vertices.push(d); vertices.push(b);
-
-            
+            vertices.push(d); vertices.push(c); vertices.push(b);
         }
     }
 	
@@ -199,12 +282,60 @@ function getPatch(xmin, xmax, zmin, zmax)
         colors.push(vec4(1.0, 1.0, 1.0, 1.0));
     }
 
-    for (var k = 0; k < vertices.length; k ++){
-        normals.push(vec4(vertices[k][0], vertices[k][1], vertices[k][2], 0));
+    for (var k = 0; k < vertices.length; k += 3)
+    {
+        a = vertices[k];
+        b = vertices[k + 1];
+        c = vertices[k + 2];
+        if (!(a in verticesFaces))
+        {   
+            verticesFaces[a] = []
+        }
+        verticesFaces[a].push(faceNum)
+
+        if (!(b in verticesFaces))
+        {   
+            verticesFaces[b] = []
+        }
+        verticesFaces[b].push(faceNum)
+
+        if (!(c in verticesFaces))
+        {   
+            verticesFaces[c] = []
+        }
+        verticesFaces[c].push(faceNum)
+        //verticesFaces has key = vertex, value = a list of all faces conntected to it
+
+        faces[faceNum++] = [a,b,c, getNormal(a,b,c)];
+        //faces has key = faceNum and key = vertices conntected to it and the normal
+        
     }
-    console.log(points);
-    console.log(vertices);
+    console.log(Object.keys(verticesFaces).length);
 }   
+
+function getNormalAverage(normals)
+{
+    var normal = normals[0]
+    for (let k = 1; k < normals.length; k ++)
+    {
+        normal = add(normal, normals[k])
+    }
+    if ( !isFinite(length(normal)) ) {
+        return vec3()
+    } 
+    return normalize(normal)
+}
+
+function getNormal(a, b, c)
+{
+    //Anisa recitation code
+
+    var t1 = subtract(b, a);
+    var t2 = subtract(c, a);
+    var normal = cross(t1, t2);
+    var normal = vec3(normal);
+    return normal
+}
 
 function animate(time)
 {
@@ -216,24 +347,14 @@ function animate(time)
     projectionMatrix = ortho(left, right, bottom, ytop, near, far);
     modelViewMatrix = lookAt(eye, at , up);
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
-    
-    
-    
     gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
-    // the variable 'colors' will always have the active shading scheme colors
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-
-    gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     if (fill % 4 === 0){ // wireframe
-        gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
         for( var i=0; i<vertices.length; i+=3)
             gl.drawArrays( gl.LINE_LOOP, i, 3 );
     }
     else if (fill  % 4 > 0){ // shading involved
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
         gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
     }
 
@@ -264,9 +385,10 @@ function getVertexColor(vertex)
     return color
 }
 
-function setColors(){
-    if (fill % 4 === 1){ // flat shading
-        for (var k = 0; k < vertices.length; k += 3)
+
+function setColors()
+{
+    for (var k = 0; k < vertices.length; k += 3)
         {
             var r = 0; var g = 0; var b = 0;
             
@@ -286,25 +408,53 @@ function setColors(){
             {
                 colors[k + i] = vec4(r, g, b, 1);
             }
+        }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+}
 
 
-        } 
+function setNormals(){
 
+    // vNormal[i] refers to the normal for vertices[i]
+    if (fill % 4 === 1){ // flat shading
+        vNormals = [];
+
+        for (let k = 0; k < faceNum; k++)
+        {
+            faceNormal = faces[k][3];
+            for (let i = 0; i < 3; i++)
+            {
+                vNormals.push(faceNormal); //face normal added 3 times for each vertex
+            }
+        
+        }
+        
     }
     else if (fill % 4 === 2){ // smooth shading
+        vNormals = [];
+        for (let k = 0; k < vertices.length; k++)
+        {
+            var vertexNormals = []
+            var attachedFaces = verticesFaces[vertices[k]];
+            for (let i = 0; i < attachedFaces.length; i++)
+            {
+                //normals of all faces assoicated with that normal
+                vertexNormals.push(faces[attachedFaces[i]][3]);
+            }   
+            vNormals.push(getNormalAverage(vertexNormals)); //average normal
+
+        }
 
     }   
+    
     else if (fill % 4 == 3){ // Phong shading 
 
     }
-    else
-    {
-        for (var k = 0; k < points.length; k++)
-        {
-            colors[k] = vec4(1, 1, 1, 1);
-        } 
-    }
-    return colors;
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(vNormals), gl.STATIC_DRAW);   
 }
 
 function getKeyPress(event){
@@ -334,6 +484,8 @@ function getKeyPress(event){
     }
     else if (event.code === 'KeyV'){ // toggle view
         fill = fill + 1;
-        colors = setColors(); // sets the colors array
+        //colors = setColors(); // sets the colors array
+        setNormals(); //changing normals for the shading 
+         
     }
 }
