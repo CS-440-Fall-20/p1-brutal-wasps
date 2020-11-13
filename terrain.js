@@ -157,6 +157,7 @@ window.onload = function init()
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
     getPatch(-5, 5, -5, 5);
+    
 
     eye = vec3(x_pos,
     y_pos,
@@ -172,6 +173,8 @@ window.onload = function init()
     //gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
     //gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
+
+    
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
@@ -215,7 +218,7 @@ window.onload = function init()
             "shininess"), materialShininess);
 
     //render()
-    console.log(vNormals);
+    setNormals();
     setColors();
     animate(0);
 }
@@ -339,6 +342,8 @@ function getNormal(a, b, c)
 
 function animate(time)
 {
+    console.log(vNormals.length);
+    console.log(vertices.length);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
     z_pos += mov_speed;
@@ -351,8 +356,11 @@ function animate(time)
 
 
     if (fill % 4 === 0){ // wireframe
+        gl.drawArrays(gl.LINES, 0, vertices.length);
+        /*
         for( var i=0; i<vertices.length; i+=3)
             gl.drawArrays( gl.LINE_LOOP, i, 3 );
+        */
     }
     else if (fill  % 4 > 0){ // shading involved
         gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
@@ -388,6 +396,7 @@ function getVertexColor(vertex)
 
 function setColors()
 {
+    
     for (var k = 0; k < vertices.length; k += 3)
         {
             var r = 0; var g = 0; var b = 0;
@@ -418,7 +427,7 @@ function setColors()
 function setNormals(){
 
     // vNormal[i] refers to the normal for vertices[i]
-    if (fill % 4 === 1){ // flat shading
+    if (fill % 4 <= 1){ // flat shading
         vNormals = [];
 
         for (let k = 0; k < faceNum; k++)
