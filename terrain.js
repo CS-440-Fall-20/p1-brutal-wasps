@@ -62,7 +62,7 @@ uniform mat4 modelViewMatrix;
 void main()
 {
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
-    float divideZ = 1.05 + position.z;
+    float divideZ = 1.1 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
     color = vertexColor;
 }
@@ -217,24 +217,24 @@ function animate(time)
     atRotated = mult(rotationMatrix, vec4(at, 0)).splice(0, 3);
     upRotated = mult(rotationMatrix, vec4(up, 0)).splice(0, 3);
 
-    eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
-    atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
+    //eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
+    //atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
 
     right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
     left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
 
     if ( right_eye > maxPatchX){
-        maxPatchX = maxPatchX + 5;
-        newPatch = true;
+        //maxPatchX = maxPatchX + 5;
+        //newPatch = true;
     }
     else if (left_eye < maxPatchX -10)
     {
-        maxPatchX = maxPatchX - 5;
-        newPatch = true;
+        //maxPatchX = maxPatchX - 5;
+        //newPatch = true;
     }
     else if ( at[2] + far > maxPatchZ ){
-        maxPatchZ = Math.ceil(at[2] + far + 5);
-        newPatch = true;
+        //maxPatchZ = Math.ceil(at[2] + far + 5);
+        //newPatch = true;
     }
     
     if (newPatch) {
@@ -382,9 +382,9 @@ function getKeyPress(event){
         else if (event.code === 'KeyE'){ //
             if ( ourPlane.roll > -90.5 ) ourPlane.roll -= 0.5;
         }
-        at = vec3(x_pos, y_pos, z_pos);
-        eye = vec3(x_pos, y_pos, z_pos - diff);
-        up = vec3(0.0, 1.0, 0.0);
+        //at = vec3(x_pos, y_pos, z_pos);
+        //eye = vec3(x_pos, y_pos, z_pos - diff);
+        //up = vec3(0.0, 1.0, 0.0);
 
         
     }
