@@ -210,6 +210,8 @@ var atRotatedStored;
 var upStored;
 var eyeStored;
 var contrained = false;
+var lastEye;
+var lastPitch;
 
 function animate(time)
 {
@@ -219,7 +221,7 @@ function animate(time)
     eye[2] = z_pos - diff;
 
 
-    
+
     rotationMatrix = mult(rotateZ(ourPlane.roll), mult(rotateY(ourPlane.yaw), rotateX(ourPlane.pitch)));
     eyeRotated = mult(rotationMatrix, vec4(eye, 0)).splice(0, 3);
     atRotated = mult(rotationMatrix, vec4(at, 0)).splice(0, 3);
@@ -228,7 +230,7 @@ function animate(time)
     //console.log(atRotated);
     
 
-
+    console.log(ourPlane.pitch, lastPitch);
     if (contrained)
     {
         atRotated[1] = atRotatedStored
@@ -241,18 +243,22 @@ function animate(time)
 
     if (eyeRotated[1] < 2.5 && !contrained)
     {
+        lastEye = eyeRotated[1];
         eyeRotated[1] = 2.5;
         atRotatedStored = atRotated[1];
         upStored = upRotated[1];
         contrained = true;
+        lastPitch = ourPlane.pitch;
     }
 
     if (eyeRotated[1] > 3.5 && !contrained)
     {
+        lastEye = eyeRotated[1];
         eyeRotated[1] = 3.5;
         atRotatedStored = atRotated[1];
         upStored = upRotated[1];
         contrained = true;
+        lastPitch = ourPlane.pitch;
     }
 
     
@@ -260,22 +266,23 @@ function animate(time)
     //eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
     //atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
 
-    console.log(eyeRotated);
+    
 
     right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
     left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
+    console.log(eyeRotated);
 
-    if ( right_eye > maxPatchX){
-        //maxPatchX = maxPatchX + 5;
-        //newPatch = true;
+    if ( eyeRotated[0] > maxPatchX){
+        maxPatchX = maxPatchX + 5;
+        newPatch = true;
     }
-    else if (left_eye < maxPatchX -10){
-        //PatchX = maxPatchX - 5;
-        //newPatch = true;
+    else if (eyeRotated[0] < maxPatchX - 10){
+        maxPatchX = maxPatchX - 5;
+        newPatch = true;
     }
-    else if ( at[2] + far > maxPatchZ ){
-        //maxPatchZ = Math.ceil(at[2] + far + 5);
-        //newPatch = true;
+    else if ( eyeRotated[2] + far > maxPatchZ ){
+        maxPatchZ = Math.ceil(maxPatchZ + 5);
+        newPatch = true;
     }
     
     if (newPatch) {
