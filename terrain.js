@@ -210,8 +210,16 @@ function animate(time)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     z_pos += ourPlane.speed;
     at[2] = z_pos;
-    
     eye[2] = z_pos - diff;
+
+    rotationMatrix = mult(rotateZ(ourPlane.roll), mult(rotateY(ourPlane.yaw), rotateX(ourPlane.pitch)));
+    eyeRotated = mult(rotationMatrix, vec4(eye, 0)).splice(0, 3);
+    atRotated = mult(rotationMatrix, vec4(at, 0)).splice(0, 3);
+    upRotated = mult(rotationMatrix, vec4(up, 0)).splice(0, 3);
+
+    eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
+    atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
+
     right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
     left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
 
@@ -234,7 +242,7 @@ function animate(time)
         colors = setColors();
     }
     projectionMatrix = ortho(left, right, bottom, ytop, near, far);
-    modelViewMatrix = lookAt(eye, at , up);
+    modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
 
     
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
@@ -372,17 +380,13 @@ function getKeyPress(event){
             if ( ourPlane.roll < 89.5 ) ourPlane.roll += 0.5;
         }
         else if (event.code === 'KeyE'){ //
-            if ( ourPlane.roll > -90.5 ) ourPlane.roll -= 0.1;
+            if ( ourPlane.roll > -90.5 ) ourPlane.roll -= 0.5;
         }
         at = vec3(x_pos, y_pos, z_pos);
         eye = vec3(x_pos, y_pos, z_pos - diff);
         up = vec3(0.0, 1.0, 0.0);
-        rotationMatrix = mult(rotateZ(ourPlane.roll), mult(rotateY(ourPlane.yaw), rotateX(ourPlane.pitch)));
-        eye = mult(rotationMatrix, vec4(eye, 0)).splice(0, 3);
-        at = mult(rotationMatrix, vec4(at, 0)).splice(0, 3);
-        up = mult(rotationMatrix, vec4(up, 0)).splice(0, 3);
-        eye[1] = Math.min(3.5, Math.max(2.5, eye[1]));
-        at[1] = Math.min(3.5, Math.max(2.5, at[1]));
+
+        
     }
 
     else if (event.code === 'KeyZ'){ //
