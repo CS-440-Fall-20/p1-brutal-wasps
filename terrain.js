@@ -132,6 +132,7 @@ window.onload = function init()
     gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vColor);
     getPatch(-maxPatchX, maxPatchX, -maxPatchZ, maxPatchZ);
+    colors = setColors();
     //render()
     animate(0);
 }
@@ -176,6 +177,7 @@ function getPatch(xmin, xmax, zmin, zmax)
     verticesAdded = 0;
     for (let z = zmin; z < zmax; z += scl)
 	{
+        
         for (let x = xmin; x < xmax; x += scl)
 		{
             let a = vec4(x, (Math.random()*4 - 2), z, 1.0);
@@ -200,7 +202,6 @@ function getPatch(xmin, xmax, zmin, zmax)
     for (var k = 0; k < points.length; k++)
     {
         points[k][1] = noise.perlin2(points[k][0], points[k][2]);
-        colors.push(vec4(1.0, 1.0, 1.0, 1.0));
     }
 }
 
@@ -209,20 +210,33 @@ function animate(time)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     z_pos += ourPlane.speed;
     at[2] = z_pos;
+    
     eye[2] = z_pos - diff;
-    if ( at[0] + 0.5 > maxPatchX ){
-        maxPatchX = Math.ceil(at[0] + 2.5) - maxPatchX;
+    right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
+    left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
+
+    if ( right_eye > maxPatchX){
+        maxPatchX = maxPatchX + 5;
         newPatch = true;
     }
-    if ( at[2] + 0.5 > maxPatchZ ){
-        maxPatchZ = Math.ceil(at[2] + 2.5) - maxPatchZ;
+    else if (left_eye < maxPatchX -10)
+    {
+        maxPatchX = maxPatchX - 5;
         newPatch = true;
     }
+    else if ( at[2] + far > maxPatchZ ){
+        maxPatchZ = Math.ceil(at[2] + far + 5);
+        newPatch = true;
+    }
+    
     if (newPatch) {
-        getPatch(-maxPatchX, maxPatchX, -maxPatchZ, maxPatchZ);
+        getPatch(maxPatchX - 10, maxPatchX, maxPatchZ - 10, maxPatchZ);
+        colors = setColors();
     }
     projectionMatrix = ortho(left, right, bottom, ytop, near, far);
     modelViewMatrix = lookAt(eye, at , up);
+
+    
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
     gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
