@@ -205,6 +205,12 @@ function getPatch(xmin, xmax, zmin, zmax)
     }
 }
 
+
+var atRotatedStored;
+var upStored;
+var eyeStored;
+var contrained = false;
+
 function animate(time)
 {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -212,13 +218,49 @@ function animate(time)
     at[2] = z_pos;
     eye[2] = z_pos - diff;
 
+
+    
     rotationMatrix = mult(rotateZ(ourPlane.roll), mult(rotateY(ourPlane.yaw), rotateX(ourPlane.pitch)));
     eyeRotated = mult(rotationMatrix, vec4(eye, 0)).splice(0, 3);
     atRotated = mult(rotationMatrix, vec4(at, 0)).splice(0, 3);
     upRotated = mult(rotationMatrix, vec4(up, 0)).splice(0, 3);
 
+    //console.log(atRotated);
+    
+
+
+    if (contrained)
+    {
+        atRotated[1] = atRotatedStored
+        upRotated[1] = upStored;
+        if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5)
+        {
+            contrained = false;
+        }
+    }
+
+    if (eyeRotated[1] < 2.5 && !contrained)
+    {
+        eyeRotated[1] = 2.5;
+        atRotatedStored = atRotated[1];
+        upStored = upRotated[1];
+        contrained = true;
+    }
+
+    if (eyeRotated[1] > 3.5 && !contrained)
+    {
+        eyeRotated[1] = 3.5;
+        atRotatedStored = atRotated[1];
+        upStored = upRotated[1];
+        contrained = true;
+    }
+
+    
+
     //eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
     //atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
+
+    console.log(eyeRotated);
 
     right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
     left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
@@ -227,9 +269,8 @@ function animate(time)
         //maxPatchX = maxPatchX + 5;
         //newPatch = true;
     }
-    else if (left_eye < maxPatchX -10)
-    {
-        //maxPatchX = maxPatchX - 5;
+    else if (left_eye < maxPatchX -10){
+        //PatchX = maxPatchX - 5;
         //newPatch = true;
     }
     else if ( at[2] + far > maxPatchZ ){
@@ -364,10 +405,11 @@ function getKeyPress(event){
     else if (event.code === 'KeyW' || event.code === 'KeyS' ||
              event.code === 'KeyE' || event.code === 'KeyA' ||
              event.code === 'KeyD' || event.code === 'KeyQ' ){
-        if (event.code === 'KeyW'){ //
+        
+        if (event.code === 'KeyW' && (!contrained || eyeRotated[1] === 3.5)){ //
             if ( ourPlane.pitch < 89.5 ) ourPlane.pitch += 0.5;
         }
-        else if (event.code === 'KeyS'){ //
+        else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)){ //
             if ( ourPlane.pitch > -90.5 ) ourPlane.pitch -= 0.5;
         }
         else if (event.code === 'KeyA'){ //
