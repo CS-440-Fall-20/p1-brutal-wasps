@@ -21,8 +21,8 @@ var y_pos = 3;
 var z_pos = -13;
 var diff = 1;
 var mov_speed = 0.01;
-var at = vec3(x_pos, y_pos, 5);
-var up = vec3(0.0, 1.0, 0.0);
+var at = vec3(x_pos, y_pos, z_pos);
+var up = vec3(0.0, 4, z_pos);
 var eye = vec3(x_pos, y_pos, z_pos - diff);
 
 const WHITE = vec4(1, 1, 1, 1);
@@ -85,11 +85,14 @@ class Plane {
         this.yaw = yaw;
         this.speed = 0.01;
         this.maxSpeed = maxSpeed;
-        this.minSpeed = 0.01;
+        this.minSpeed = 0.00;
+        this.totalPitch = 0;
+        this.totalYaw = 0;
+        this.totalRoll = 0;
     }
 }
 
-let ourPlane = new Plane(0, 0, 0, 0.1);
+let ourPlane = new Plane(0, 0, 0, 0.04);
 
 window.onload = function init()
 {
@@ -215,99 +218,95 @@ var contrained = false;
 var lastEye;
 var lastPitch;
 var cPatch = -1;
+var yUnit = vec3(0, 1, 0);
+var zUnit = vec3(0, 0, 1);
+
+
+var dirChanged = false;
+var yawChanged = false;
+var pitchChanged = false;
+var rollChanged = false;
+
 
 
 function animate(time)
 {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    z_pos += ourPlane.speed;
-    at[2] = z_pos;
-    eye[2] = z_pos - diff;
-
-
+    //z_pos += ourPlane.speed;
     
 
-    rotationMatrix = mult(rotateZ(ourPlane.roll), mult(rotateY(ourPlane.yaw), rotateX(ourPlane.pitch)));
-    eyeRotated = mult(rotationMatrix, vec4(eye, 0)).splice(0, 3);
-    atRotated = mult(rotationMatrix, vec4(at, 0)).splice(0, 3);
-    upRotated = mult(rotationMatrix, vec4(up, 0)).splice(0, 3);
+    //at[2] = z_pos;
+    //eye[2] = z_pos - diff;
 
-    //console.log(atRotated);
-
-    if (contrained)
+    if (dirChanged)
     {
-        atRotated[1] = atRotatedStored
-        upRotated[1] = upStored;
-        if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5)
+        console.log("here")
+        xRotation = rotateX(ourPlane.pitch);
+        yRotation = rotateY(ourPlane.yaw);
+        zRotation = rotateZ(ourPlane.roll);
+        //rotationMatrix = mult(, mult(, ));
+
+        if (yawChanged)
         {
-            contrained = false;
+            zUnit = normalize(mult(yRotation, vec4(zUnit, 0)).splice(0, 3));
+            yawChanged = false;
         }
-    }
 
-    if (eyeRotated[1] < 2.5 && !contrained)
-    {
-        lastEye = eyeRotated[1];
-        eyeRotated[1] = 2.5;
-        atRotatedStored = atRotated[1];
-        upStored = upRotated[1];
-        contrained = true;
-        lastPitch = ourPlane.pitch;
-    }
+        if (pitchChanged)
+        {
+            zUnit = normalize(mult(xRotation, vec4(zUnit, 0)).splice(0, 3));
+            pitchChanged = false;
+        }
 
-    if (eyeRotated[1] > 3.5 && !contrained)
-    {
-        lastEye = eyeRotated[1];
-        eyeRotated[1] = 3.5;
-        atRotatedStored = atRotated[1];
-        upStored = upRotated[1];
-        contrained = true;
-        lastPitch = ourPlane.pitch;
+        if (rollChanged)
+        {
+            yUnit = normalize(mult(zRotation, vec4(yUnit, 0)).splice(0, 3));
+            rollChanged = false;
+        }
+        
+        dirChanged = false;
     }
-
     
-    if (currentPatch(atRotated) != cPatch)
+
+    for (let index = 0; index < eye.length; index++)
+    {
+        eye[index] = eye[index] + (zUnit[index] * ourPlane.speed);
+        at[index] = eye[index] + (zUnit[index] * Math.max(0.1 , ourPlane.speed));
+        up[index] = yUnit[index];
+        //eye = add(direction, eye);
+    //up = add(direction, up);
+    }
+    
+    if (eye[1] > 3.5)
+    {
+        eye[1] = 3.5;
+        at[1] = 3.5 + (zUnit[1] * ourPlane.speed); 
+    }
+
+    else if (eye[1] < 2.5)
+    {
+        eye[1] = 2.5;
+        at[1] = 2.5 + (zUnit[1] * ourPlane.speed); 
+    }
+
+
+
+    if (currentPatch(eye) != cPatch)
     {
         console.log("PATCH CHANGED");
         var oPatch = cPatch;
-        cPatch = currentPatch(atRotated);
+        cPatch = currentPatch(eye);
         console.log(cPatch);
         if (oPatch != -1)
         {
             changeOfPatch(oPatch, cPatch);
         }
     }
-    
-    //eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
-    //atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
 
     
-    /*
-    right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
-    left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
-    console.log(eyeRotated);
-
     
-
-    if ( eyeRotated[0] > maxPatchX){
-        maxPatchX = maxPatchX + 5;
-        newPatch = true;
-    }
-    else if (eyeRotated[0] < maxPatchX - 10){
-        maxPatchX = maxPatchX - 5;
-        newPatch = true;
-    }
-    else if ( eyeRotated[2] + far > maxPatchZ ){
-        maxPatchZ = Math.ceil(maxPatchZ + 5);
-        newPatch = true;
-    }
-    
-    if (newPatch) {
-        getPatch(maxPatchX - 10, maxPatchX, maxPatchZ - 10, maxPatchZ);
-        colors = setColors();
-    }
-    */
     projectionMatrix = ortho(left, right, bottom, ytop, near, far);
-    modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
+    modelViewMatrix = lookAt(eye, at, up);
 
     
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
@@ -579,23 +578,54 @@ function getKeyPress(event){
              event.code === 'KeyE' || event.code === 'KeyA' ||
              event.code === 'KeyD' || event.code === 'KeyQ' ){
         
+        dirChanged = true;
         if (event.code === 'KeyW' && (!contrained || eyeRotated[1] === 3.5)){ //
-            if ( ourPlane.pitch < 89.5 ) ourPlane.pitch += 0.5;
+            if ( ourPlane.totalPitch < 89.5 ) 
+            {
+                ourPlane.pitch = 0.5;
+                pitchChanged = true;
+                ourPlane.totalPitch += 0.5;
+            }
         }
         else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)){ //
-            if ( ourPlane.pitch > -90.5 ) ourPlane.pitch -= 0.5;
+            if ( ourPlane.totalPitch > -90.5 ) 
+            {   
+                ourPlane.pitch = -0.5;
+                pitchChanged = true;
+                ourPlane.totalPitch -= 0.5;
+            }
         }
         else if (event.code === 'KeyA'){ //
-            if ( ourPlane.yaw < 89.5 ) ourPlane.yaw += 0.5;
+            if ( ourPlane.totalYaw < 89.5 ) 
+            {
+                ourPlane.yaw = 0.5;
+                yawChanged = true;
+                ourPlane.totalYaw += 0.5
+            }
         }
         else if (event.code === 'KeyD'){ //
-            if ( ourPlane.yaw > -90.5 ) ourPlane.yaw -= 0.5;
+            if ( ourPlane.totalYaw > -90.5 ) 
+            {
+                ourPlane.yaw = -0.5;
+                yawChanged = true;
+                ourPlane.totalYaw -= 0.5
+            }
         }
         else if (event.code === 'KeyQ'){ //
-            if ( ourPlane.roll < 89.5 ) ourPlane.roll += 0.5;
+            if ( ourPlane.totalRoll < 89.5 ) 
+            {
+                ourPlane.roll = 0.5;
+                rollChanged = true;
+                ourPlane.totalRoll += 0.5;
+            }
         }
         else if (event.code === 'KeyE'){ //
-            if ( ourPlane.roll > -90.5 ) ourPlane.roll -= 0.5;
+            if ( ourPlane.totalRoll > -90.5 ) 
+            {
+                ourPlane.roll = -0.5;
+                rollChanged = true;
+                ourPlane.totalRoll -= 0.5;
+            }
         }
         //at = vec3(x_pos, y_pos, z_pos);
         //eye = vec3(x_pos, y_pos, z_pos - diff);
@@ -606,7 +636,6 @@ function getKeyPress(event){
 
     else if (event.code === 'KeyZ'){ //
         ourPlane.speed = Math.min(ourPlane.speed + 0.01, ourPlane.maxSpeed);
-        console.log(z_pos);
     }
     else if (event.code === 'KeyX'){ //
         ourPlane.speed = Math.max(ourPlane.speed - 0.01, ourPlane.minSpeed);
