@@ -62,7 +62,7 @@ uniform mat4 modelViewMatrix;
 void main()
 {
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
-    float divideZ = 1.1 + position.z;
+    float divideZ = 1.15 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
     color = vertexColor;
 }
@@ -266,6 +266,19 @@ function animate(time)
         
         dirChanged = false;
     }
+
+    if (eye[1] > 3.5)
+    {
+        eye[1] = 3.5;
+        //at[1] = 3.5 + (zUnit[1] * ourPlane.speed); 
+    }
+
+    else if (eye[1] < 2.5)
+    {
+        eye[1] = 2.5;
+        //at[1] = 2.5 + (zUnit[1] * ourPlane.speed); 
+    }
+
     
 
     for (let index = 0; index < eye.length; index++)
@@ -276,18 +289,24 @@ function animate(time)
         //eye = add(direction, eye);
     //up = add(direction, up);
     }
-    
+
+    console.log(eye, at);
+    console.log(zUnit);
+
+
+    /*
     if (eye[1] > 3.5)
     {
         eye[1] = 3.5;
-        at[1] = 3.5 + (zUnit[1] * ourPlane.speed); 
+        //at[1] = 3.5 + (zUnit[1] * ourPlane.speed); 
     }
 
     else if (eye[1] < 2.5)
     {
         eye[1] = 2.5;
-        at[1] = 2.5 + (zUnit[1] * ourPlane.speed); 
+        //at[1] = 2.5 + (zUnit[1] * ourPlane.speed); 
     }
+    */
 
 
 
@@ -579,20 +598,20 @@ function getKeyPress(event){
              event.code === 'KeyD' || event.code === 'KeyQ' ){
         
         dirChanged = true;
-        if (event.code === 'KeyW' && (!contrained || eyeRotated[1] === 3.5)){ //
+        if (event.code === 'KeyW' && (eye[1] >= 2.5)){ //
             if ( ourPlane.totalPitch < 89.5 ) 
             {
-                ourPlane.pitch = 0.5;
+                ourPlane.pitch = 0.3;
                 pitchChanged = true;
-                ourPlane.totalPitch += 0.5;
+                ourPlane.totalPitch += 0.3;
             }
         }
-        else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)){ //
+        else if (event.code === 'KeyS' && (eye[1] <= 3.5)){ //
             if ( ourPlane.totalPitch > -90.5 ) 
             {   
-                ourPlane.pitch = -0.5;
+                ourPlane.pitch = -0.3;
                 pitchChanged = true;
-                ourPlane.totalPitch -= 0.5;
+                ourPlane.totalPitch -= 0.3;
             }
         }
         else if (event.code === 'KeyA'){ //
