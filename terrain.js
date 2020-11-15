@@ -72,6 +72,7 @@ void main()
     float divideZ = 1.15 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
     color = vertexColor;
+    gl_PointSize = 2.0; 
 }
 `
 
