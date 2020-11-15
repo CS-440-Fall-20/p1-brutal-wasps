@@ -12,8 +12,18 @@
 <body class="body">
         <h2 class ="header"> Flight Simulator </h2>
 
-        <!-- Initialize Canvas -->
 
+
+        <div class="div1">
+          <h4> Bonus Functionality </h4>
+          <ul>
+            <li> <p> The height map is not completely random but is sensitive to neighboring points </p></li>
+            <li> <p> Multiple types of audio added for enhanced customer experience . Press P to toggle the background audio. </p> </li>
+            <li> <p> Speed beyond a certain limit triggers a "warning" To avoid it, drive slower (or decrease your speed). </p> </li>
+          </ul>
+        </div>
+
+        <!-- Initialize Canvas -->
         <p align="center">
             <canvas id="gl-canvas" width="800" height="450" style="border:0.5px solid #FFFFFF;">
                 Oops ... your browser doesn't support the HTML5 canvas element
@@ -24,9 +34,17 @@
             <source src="" type="audio/mpeg">
             Your browser does not support the audio element.
         </audio><br>
+
+        <audio id="accAudio" controls style="display: none;">
+            <source src="" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio><br>
+
         <style type="text/css">
 
-            .body
+
+
+        .body
 			{
                 background-color: black;
             }
@@ -56,6 +74,17 @@
                 #999
               )
             }
+
+          .div1 {
+            position: absolute;
+            color: white;
+            width: 19%;
+            left : 0;
+            max-width: 19%;
+            padding-left: 1%;
+            display: inline;
+            overflow: hidden;
+          }
         </style>
 </body>
 
