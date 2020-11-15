@@ -68,7 +68,7 @@ var materialDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
 var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 
 var materialShininess = 100.0;
-var ka = 1.0;
+var ka = 0.0;
 var kd = 1.0;
 var ks = 1.0;
 
@@ -175,7 +175,7 @@ precision mediump float;
 
 varying vec3 normalInterp;
 
-uniform vec3 ambientLight, diffuseLight, specularLight;
+uniform vec4 ambientProduct, diffuseProduct, specularProduct;
 uniform vec4 lightPosition;
 
 uniform float shininess;
@@ -206,9 +206,9 @@ void main()
         specular = pow(specAngle, shininess);
       }
 
-    gl_FragColor = color * vec4(Ka * ambientLight.xyz +
-                        Kd * lambertian * diffuseLight.xyz +
-                        Ks * specular * specularLight.xyz, 1.0);
+    gl_FragColor = color * vec4(Ka * ambientProduct.xyz +
+                        Kd * lambertian * diffuseProduct.xyz +
+                        Ks * specular * specularProduct.xyz, 1.0);
 }
 `
 
@@ -222,8 +222,8 @@ window.onload = function init()
     }
 
     program = gl.createProgram();
-    vertShdr = createShaderHelper(vertexShaderPhong, true);
-    fragShdr = createShaderHelper(fragShaderPhong, false);
+    vertShdr = createShaderHelper(vertexShader, true);
+    fragShdr = createShaderHelper(fragShader, false);
 
     gl.attachShader( program, vertShdr );
     gl.attachShader( program, fragShdr );
@@ -239,49 +239,8 @@ window.onload = function init()
     eye = vec3(x_pos,
     y_pos,
     z_pos - diff);
-
-    modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
-    projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
     
-    vertexBuffer = gl.createBuffer();
-    gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
-    gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
-    var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
-	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
-    gl.enableVertexAttribArray( vertexPosition );
-
-    
-    vertexColor = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-    var vColor = gl.getAttribLocation(program, "vertexColor");
-    gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vColor);
-    
-
-    //inspired from Anisa recitation
-    normalBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(vNormals), gl.STATIC_DRAW);
-    var vNormal = gl.getAttribLocation(program, "vNormal");
-    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vNormal);
-
-    var ambientProduct = mult(lightAmbient, materialAmbient);
-    var diffuseProduct = mult(lightDiffuse, materialDiffuse);
-    var specularProduct = mult(lightSpecular, materialSpecular);
-
-    gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
-        flatten(ambientProduct));
-    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"),
-        flatten(diffuseProduct));
-    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"),
-        flatten(specularProduct));
-    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
-        flatten(lightPosition));
-
-    gl.uniform1f(gl.getUniformLocation(program,
-            "shininess"), materialShininess);
+    enableAllBuffers();
 
     //render()
     setNormals();
@@ -420,7 +379,6 @@ function animate(time)
     gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
     gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
-
     if (fill % 4 === 0){ // wireframe
         gl.drawArrays(gl.LINES, 0, vertices.length);
     }
@@ -437,6 +395,50 @@ function animate(time)
     window.requestAnimationFrame(animate);
 }
 
+function enableAllBuffers(){
+    
+    modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
+    projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
+    
+    vertexBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
+    gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
+    var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
+	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vertexPosition );
+    
+    vertexColor = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+    var vColor = gl.getAttribLocation(program, "vertexColor");
+    gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vColor);
+
+    //inspired from Anisa recitation
+    normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(vNormals), gl.STATIC_DRAW);
+    var vNormal = gl.getAttribLocation(program, "vNormal");
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    var ambientProduct = mult(lightAmbient, materialAmbient);
+    var diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    var specularProduct = mult(lightSpecular, materialSpecular);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
+        flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"),
+        flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"),
+        flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
+        flatten(lightPosition));
+
+    gl.uniform1f(gl.getUniformLocation(program,
+            "shininess"), materialShininess);
+}
+
 function enablePhongShading(){
     if (!phongBool){
         console.log(ka + " " + kd + " " + ks);
@@ -450,19 +452,17 @@ function enablePhongShading(){
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
 
-        gl.uniform4fv(gl.getUniformLocation(program,
-            "ambientLight"), flatten(lightAmbient));
-        gl.uniform4fv(gl.getUniformLocation(program,
-            "diffuseLight"), flatten(lightDiffuse));
-        gl.uniform4fv(gl.getUniformLocation(program,
-            "specularLight"), flatten(lightSpecular));
+        gl.linkProgram( program );
+        gl.useProgram( program );
 
-        gl.uniform1fv(gl.getUniformLocation(program,
+        gl.uniform1f(gl.getUniformLocation(program,
             "Ka"), ka);
-        gl.uniform1fv(gl.getUniformLocation(program,
+        gl.uniform1f(gl.getUniformLocation(program,
             "Kd"), kd);
-        gl.uniform1fv(gl.getUniformLocation(program,
+        gl.uniform1f(gl.getUniformLocation(program,
             "Ks"), ks);
+
+        enableAllBuffers();
     }
 }
 
@@ -477,6 +477,11 @@ function disablePhongShading(){
             
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
+
+        gl.linkProgram( program );
+        gl.useProgram( program );
+
+        enableAllBuffers();
     }
     phongBool = false;
 }
