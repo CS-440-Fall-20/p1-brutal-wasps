@@ -1,5 +1,4 @@
-var TRIANGLE_MODE = 0;
-var QUAD_MODE = 1;
+var running = true;
 var gl;
 var colorBuffer;
 var vertexBuffer;
@@ -10,19 +9,24 @@ var colors = [];
 var points1 = [];
 var vertices = [];
 var rotationMatrix = mat4();
+var rotationMatrix1 = mat4();
 var modelViewMatrix = mat4();
 var projectionMatrix = mat4();
+var upVector;
+var atVector;
+var perpendicular;
+
 var newPatch = true;
 var verticesAdded = 0;
 var pointsAdded = 0;
 
 var x_pos = 0;
 var y_pos = 3;
-var z_pos = -13;
+var z_pos = 0;
 var diff = 1;
 var mov_speed = 0.01;
-var at = vec3(x_pos, y_pos, 5);
-var up = vec3(0.0, 1.0, 0.0);
+var at = vec3(x_pos, y_pos, z_pos);
+var up = vec3(0, 1, 0);
 var eye = vec3(x_pos, y_pos, z_pos - diff);
 
 const WHITE = vec4(1, 1, 1, 1);
@@ -34,8 +38,8 @@ var left = -2.5;
 var right = 2.5;
 var ytop = 0.5;
 var bottom = -3;
-var near = -2.5;
-var far = 2.5;
+var near = -5;
+var far = 5;
 
 //patch dimension
 var maxPatchX = 15;
@@ -46,11 +50,13 @@ var speed = 0.05;
 
 var modelViewMatrixLoc;
 var projectionMatrixLoc;
-
+var rotationMatrixLoc;
 var fill = 0;
 
 // get key press event listener
-document.addEventListener('keypress', getKeyPress);
+document.addEventListener('keydown', getKeyPress);
+document.addEventListener("keyup", getKeyUp);
+//document.addEventListener("keydown", getKeyPress);
 
 //vertex shader
 var vertexShader = `
@@ -62,7 +68,7 @@ uniform mat4 modelViewMatrix;
 void main()
 {
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
-    float divideZ = 1.1 + position.z;
+    float divideZ = 1.15 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
     color = vertexColor;
 }
@@ -83,9 +89,14 @@ class Plane {
         this.roll = roll;
         this.pitch = pitch;
         this.yaw = yaw;
+
+        this.yawRotate = 0.0;
+        this.rollRotate = 0.0;
+        this.pitchRotate = 0.0;
+
         this.speed = 0.01;
         this.maxSpeed = maxSpeed;
-        this.minSpeed = 0.01;
+        this.minSpeed = 0.0;
     }
 }
 
@@ -119,7 +130,6 @@ window.onload = function init()
 
     makeSmallPatches();
     colors = setColors();
-    console.log(vertices.length);
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
@@ -134,8 +144,9 @@ window.onload = function init()
     var vColor = gl.getAttribLocation(program, "vertexColor");
     gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vColor);
-    
+
     //render()
+    getRotations();
     animate(0);
 }
 
@@ -185,6 +196,7 @@ function getPatch(xmin, xmax, zmin, zmax)
             let b = vec4(x + scl, noise.perlin2(x + scl, z) * 2, z, 1.0);
             let c = vec4(x, noise.perlin2(x, z + scl) * 2, z + scl, 1.0);
             let d = vec4(x + scl, noise.perlin2(x + scl, z + scl) * 2, z + scl, 1.0);
+            if (a[1] > 1.7) console.log(a);
             vertices.push(a); vertices.push(b); vertices.push(c);
             vertices.push(add(d, vec4(0,0,0,0))); vertices.push(add(b, vec4(0,0,0,0))); vertices.push(add(c, vec4(0,0,0,0)));
         }
@@ -207,7 +219,6 @@ function closeToEdge(x, z, xmin, xmas, zmin, zmax, threshold)
 
 }
 
-
 var atRotatedStored;
 var upStored;
 var eyeStored;
@@ -216,115 +227,139 @@ var lastEye;
 var lastPitch;
 var cPatch = -1;
 
+function translate(axis){
+
+    for (var i = 0; i < axis.length; i++) {
+        eye[i] += ourPlane.speed * axis[i];
+        at[i] = atRotated[i] + ourPlane.speed * axis[i];
+    }
+
+    atRotated = at;
+    upRotated = up;
+    eyeRotated = eye;
+}
+
+function getRotations(){
+    upVector = up;
+    atVector = subtract(at, eye);
+    perpendicular = cross(upVector, atVector);
+
+    //rotate around up vector and get new at and perpendicular vectors
+    var yawRotation = rotate(ourPlane.yawRotate, upVector);
+    atVector = mult(yawRotation, vec4(atVector, 0.0)).splice(0, 3);
+    perpendicular = mult(yawRotation, vec4(perpendicular, 0.0)).splice(0, 3);
+
+    //now rotate around the new perpendicular vector
+    //and get new up and at vectors
+    var pitchRotation = rotate(ourPlane.pitchRotate, perpendicular);
+    atVector = mult(pitchRotation, vec4(atVector, 0.0)).splice(0, 3);
+    upVector = mult(pitchRotation, vec4(upVector, 0.0)).splice(0, 3);
+
+    //now rotate around the new at vector
+    //and get new up and perpendicular vectors
+    var rollRotation = rotate(ourPlane.rollRotate, atVector);
+    perpendicular = mult(rollRotation, vec4(perpendicular, 0.0)).splice(0, 3);
+    upVector = mult(rollRotation, vec4(upVector, 0.0)).splice(0, 3);
+
+    atRotated = add(atVector, eye);
+    up = upVector;
+}
 
 function animate(time)
 {
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    z_pos += ourPlane.speed;
-    at[2] = z_pos;
-    eye[2] = z_pos - diff;
+    if (running) {
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        translate(atVector);
 
-
-    
-
-    rotationMatrix = mult(rotateZ(ourPlane.roll), mult(rotateY(ourPlane.yaw), rotateX(ourPlane.pitch)));
-    eyeRotated = mult(rotationMatrix, vec4(eye, 0)).splice(0, 3);
-    atRotated = mult(rotationMatrix, vec4(at, 0)).splice(0, 3);
-    upRotated = mult(rotationMatrix, vec4(up, 0)).splice(0, 3);
-
-    //console.log(atRotated);
-
-    if (contrained)
-    {
-        atRotated[1] = atRotatedStored
-        upRotated[1] = upStored;
-        if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5)
+        if (contrained)
         {
-            contrained = false;
+            atRotated[1] = atRotatedStored
+            upRotated[1] = upStored;
+            if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5)
+            {
+                contrained = false;
+            }
+        }
+
+        if (eyeRotated[1] < 2.5 && !contrained)
+        {
+            lastEye = eyeRotated[1];
+            eyeRotated[1] = 2.5;
+            atRotatedStored = atRotated[1];
+            upStored = upRotated[1];
+            contrained = true;
+            lastPitch = ourPlane.pitch;
+        }
+
+        if (eyeRotated[1] > 3.5 && !contrained)
+        {
+            lastEye = eyeRotated[1];
+            eyeRotated[1] = 3.5;
+            atRotatedStored = atRotated[1];
+            upStored = upRotated[1];
+            contrained = true;
+            lastPitch = ourPlane.pitch;
+        }
+
+
+        if (currentPatch(atRotated) != cPatch)
+        {
+            var oPatch = cPatch;
+            cPatch = currentPatch(atRotated);
+            if (oPatch != -1)
+            {
+                changeOfPatch(oPatch, cPatch);
+            }
+        }
+
+        //eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
+        //atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
+
+
+        /*
+        right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
+        left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
+        console.log(eyeRotated);
+
+
+
+        if ( eyeRotated[0] > maxPatchX){
+            maxPatchX = maxPatchX + 5;
+            newPatch = true;
+        }
+        else if (eyeRotated[0] < maxPatchX - 10){
+            maxPatchX = maxPatchX - 5;
+            newPatch = true;
+        }
+        else if ( eyeRotated[2] + far > maxPatchZ ){
+            maxPatchZ = Math.ceil(maxPatchZ + 5);
+            newPatch = true;
+        }
+
+        if (newPatch) {
+            getPatch(maxPatchX - 10, maxPatchX, maxPatchZ - 10, maxPatchZ);
+            colors = setColors();
+        }
+        */
+        projectionMatrix = ortho(left, right, bottom, ytop, near, far);
+        modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
+
+
+        gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
+        gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
+
+        //gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
+        // the variable 'colors' will always have the active shading scheme colors
+        //gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+
+
+        if (fill % 4 === 0){ // wireframe
+            gl.drawArrays( gl.LINES, 0, vertices.length );
+        }
+        else if (fill  % 4 > 0){ // shading involved
+            gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
         }
     }
-
-    if (eyeRotated[1] < 2.5 && !contrained)
-    {
-        lastEye = eyeRotated[1];
-        eyeRotated[1] = 2.5;
-        atRotatedStored = atRotated[1];
-        upStored = upRotated[1];
-        contrained = true;
-        lastPitch = ourPlane.pitch;
-    }
-
-    if (eyeRotated[1] > 3.5 && !contrained)
-    {
-        lastEye = eyeRotated[1];
-        eyeRotated[1] = 3.5;
-        atRotatedStored = atRotated[1];
-        upStored = upRotated[1];
-        contrained = true;
-        lastPitch = ourPlane.pitch;
-    }
-
-    
-    if (currentPatch(atRotated) != cPatch)
-    {
-        console.log("PATCH CHANGED");
-        var oPatch = cPatch;
-        cPatch = currentPatch(atRotated);
-        console.log(cPatch);
-        if (oPatch != -1)
-        {
-            changeOfPatch(oPatch, cPatch);
-        }
-    }
-    
-    //eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
-    //atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
-
-    
-    /*
-    right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
-    left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
-    console.log(eyeRotated);
-
-    
-
-    if ( eyeRotated[0] > maxPatchX){
-        maxPatchX = maxPatchX + 5;
-        newPatch = true;
-    }
-    else if (eyeRotated[0] < maxPatchX - 10){
-        maxPatchX = maxPatchX - 5;
-        newPatch = true;
-    }
-    else if ( eyeRotated[2] + far > maxPatchZ ){
-        maxPatchZ = Math.ceil(maxPatchZ + 5);
-        newPatch = true;
-    }
-    
-    if (newPatch) {
-        getPatch(maxPatchX - 10, maxPatchX, maxPatchZ - 10, maxPatchZ);
-        colors = setColors();
-    }
-    */
-    projectionMatrix = ortho(left, right, bottom, ytop, near, far);
-    modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
-
-    
-    gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
-    gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
-
-    //gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
-    // the variable 'colors' will always have the active shading scheme colors
-    //gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-
-    
-    if (fill % 4 === 0){ // wireframe
-        gl.drawArrays( gl.LINES, 0, vertices.length );
-    }
-    else if (fill  % 4 > 0){ // shading involved
-        gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
-    }
-
     window.requestAnimationFrame(animate);
 }
 
@@ -332,7 +367,7 @@ function shareRow(patch1, patch2)
 {
     var a = BOTTOM_ROW.includes(patch1) && BOTTOM_ROW.includes(patch2);
     var b = MIDDLE_ROW.includes(patch1) && MIDDLE_ROW.includes(patch2);
-    var c = TOP_ROW.includes(patch1) && TOP_ROW.includes(patch2); 
+    var c = TOP_ROW.includes(patch1) && TOP_ROW.includes(patch2);
     return a || b || c
 }
 
@@ -404,7 +439,7 @@ function translatePatches(patchesNum, tx, tz)
     }
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferSubData( gl.ARRAY_BUFFER, 0, flatten(vertices));
-    
+
 }
 
 
@@ -545,27 +580,27 @@ function setColors(){
 
 
 function getKeyPress(event){
-    if (event.code === 'Numpad4'){ // left
+    if (event.code === 'Numpad4' && left > -5 && right > 0){ // left
         left = left - speed;
         right = right - speed;
     }
-    else if (event.code === 'Numpad6'){ // right
+    else if (event.code === 'Numpad6' && left < 0 && right < 5){ // right
         left = left + speed;
         right = right + speed;
     }
-    else if (event.code === 'Numpad8'){ // up
+    else if (event.code === 'Numpad8' && ytop < 1.5 && bottom < -2 ){ // up
         ytop = ytop + speed;
         bottom = bottom + speed;
     }
-    else if (event.code === 'Numpad2'){ // down
+    else if (event.code === 'Numpad2' && ytop > -1.5 && bottom > -4){ // down
         ytop = ytop - speed;
         bottom = bottom - speed;
     }
-    else if (event.code === 'Numpad5'){ // in
+    else if (event.code === 'Numpad5' && near > -6 && far > 4 ){ // in
         near = near - speed;
         far = far - speed;
     }
-    else if (event.code === 'Numpad0'){ // far
+    else if (event.code === 'Numpad0' && near < -4 && far < 6){ // far
         near = near + speed;
         far = far + speed;
     }
@@ -578,38 +613,60 @@ function getKeyPress(event){
     else if (event.code === 'KeyW' || event.code === 'KeyS' ||
              event.code === 'KeyE' || event.code === 'KeyA' ||
              event.code === 'KeyD' || event.code === 'KeyQ' ){
-        
-        if (event.code === 'KeyW' && (!contrained || eyeRotated[1] === 3.5)){ //
-            if ( ourPlane.pitch < 89.5 ) ourPlane.pitch += 0.5;
-        }
-        else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)){ //
-            if ( ourPlane.pitch > -90.5 ) ourPlane.pitch -= 0.5;
-        }
-        else if (event.code === 'KeyA'){ //
-            if ( ourPlane.yaw < 89.5 ) ourPlane.yaw += 0.5;
-        }
-        else if (event.code === 'KeyD'){ //
-            if ( ourPlane.yaw > -90.5 ) ourPlane.yaw -= 0.5;
-        }
-        else if (event.code === 'KeyQ'){ //
-            if ( ourPlane.roll < 89.5 ) ourPlane.roll += 0.5;
-        }
-        else if (event.code === 'KeyE'){ //
-            if ( ourPlane.roll > -90.5 ) ourPlane.roll -= 0.5;
-        }
-        //at = vec3(x_pos, y_pos, z_pos);
-        //eye = vec3(x_pos, y_pos, z_pos - diff);
-        //up = vec3(0.0, 1.0, 0.0);
 
-        
+        if (event.code === 'KeyW' && (!contrained || eyeRotated[1] === 3.5)
+                && ourPlane.pitch < 89.5) {
+            ourPlane.pitch += 0.5;
+            ourPlane.pitchRotate = 0.5;
+            getRotations();
+        }
+        else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)
+                && ourPlane.pitch > -90.5) { //
+            ourPlane.pitch -= 0.5;
+            ourPlane.pitchRotate = -0.5;
+            getRotations();
+        }
+        else if (event.code === 'KeyA' &&  ourPlane.yaw < 89.5 ) {
+            ourPlane.yaw += 0.5;
+            console.log(ourPlane.yaw);
+            ourPlane.yawRotate = 0.5;
+            getRotations();
+        }
+        else if (event.code === 'KeyD' && ourPlane.yaw > -90.5 ) {
+            ourPlane.yaw -= 0.5;
+            ourPlane.yawRotate = -0.5;
+            getRotations();
+        }
+        else if (event.code === 'KeyQ' && ourPlane.roll < 89.5 ) {
+            ourPlane.roll += 0.5;
+            ourPlane.rollRotate = 0.5;
+            getRotations();
+        }
+        else if (event.code === 'KeyE' && ourPlane.roll > -90.5 ) {
+            ourPlane.roll -= 0.5;
+            ourPlane.rollRotate = -0.5;
+            getRotations();
+        }
     }
 
     else if (event.code === 'KeyZ'){ //
         ourPlane.speed = Math.min(ourPlane.speed + 0.01, ourPlane.maxSpeed);
-        console.log(z_pos);
     }
     else if (event.code === 'KeyX'){ //
         ourPlane.speed = Math.max(ourPlane.speed - 0.01, ourPlane.minSpeed);
     }
+    else if (event.keyCode === 27) {
+        if (running) running = false;
+        else running = true;
+        console.log(running);
+    }
+}
 
+function getKeyUp(event){
+    if (event.code === 'KeyW') this.pitchRotate = 0;
+    else if (event.code === 'KeyS') this.pitchRotate = 0;
+    else if (event.code === 'KeyA') this.yawRotate = 0;
+    else if (event.code === 'KeyD') this.yawRotate = 0;
+    else if (event.code === 'KeyQ') this.rollRotate = 0;
+    else if (event.code === 'KeyE') this.rollRotate = 0;
 }
