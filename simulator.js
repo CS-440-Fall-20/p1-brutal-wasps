@@ -72,7 +72,7 @@ void main()
     float divideZ = 1.15 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
     color = vertexColor;
-    gl_PointSize = 2.0; 
+    gl_PointSize = 2.0;
 }
 `
 
@@ -686,10 +686,10 @@ function getKeyPress(event){
         }
     }
 
-    else if (event.code === 'KeyZ'){ //
+    else if (event.keyCode === 38){ //
         ourPlane.speed = Math.min(ourPlane.speed + 0.01, ourPlane.maxSpeed);
     }
-    else if (event.code === 'KeyX'){ //
+    else if (event.keyCode === 40){ //
         ourPlane.speed = Math.max(ourPlane.speed - 0.01, ourPlane.minSpeed);
     }
     else if (event.keyCode === 27) {
