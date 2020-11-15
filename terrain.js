@@ -57,6 +57,8 @@ var modelViewMatrixLoc;
 var projectionMatrixLoc;
 
 var fill = 0;
+var viewMode = 0;
+
 
 var lightPosition = vec4(1.0, 1.0, 1.0, 0.0 );
 var lightAmbient = vec4(0.8, 0.8, 0.8, 1.0 );
@@ -127,6 +129,7 @@ void main()
     color = ambient + diffuse + specular;
     color.a = 1.0;
     color = color * vertexColor;
+    gl_PointSize = 2.0;
 }
 `
 
@@ -415,10 +418,14 @@ function animate(time)
     gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
 
 
-    if (fill % 4 === 0){ // wireframe
+    if (viewMode % 3 === 0){ // points
+        gl.drawArrays(gl.POINTS, 0, vertices.length);
+    }
+
+    else if (viewMode % 3 === 1){ //wireframe
         gl.drawArrays(gl.LINES, 0, vertices.length);
     }
-    else if (fill  % 4 > 0){ // shading involved
+    else if (viewMode  % 3 > 1){ // shading involved
         if (fill % 4 === 3){
             enablePhongShading();
         }
@@ -532,7 +539,7 @@ function setColors()
 function setNormals(){
 
     // vNormal[i] refers to the normal for vertices[i]
-    if (fill % 4 <= 1){ // flat shading, Phong shading
+    if (fill % 3 == 0){ // flat shading, Phong shading
         
         // adding Phong here:
         // add Normals at each vertex and interpolate bw them for all vertices between them
@@ -551,7 +558,7 @@ function setNormals(){
         }
         
     }
-    else if (fill % 4 === 2 || fill % 4 === 3){ // smooth shading
+    else if (fill % 3 === 1 || fill % 3 === 2){ // smooth shading
         vNormals = [];
         for (let k = 0; k < vertices.length; k++)
         {
@@ -597,10 +604,13 @@ function getKeyPress(event){
         near = near + speed;
         far = far + speed;
     }
-    else if (event.code === 'KeyV'){ // toggle view
+    else if (event.code === 'KeyC'){ // toggle shade
         fill = fill + 1;
         //colors = setColors(); // sets the colors array
         setNormals(); //changing normals for the shading 
          
+    }
+    else if (event.code === 'KeyV'){ // toggle view
+        viewMode += 1;
     }
 }
