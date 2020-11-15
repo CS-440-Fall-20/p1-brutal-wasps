@@ -110,19 +110,19 @@ void main()
     //code copy pasted from Anisa's recitation
 
     vec3 pos = -(modelViewMatrix * vertexPosition).xyz;
-    
+
     //fixed light postion
-    
+
     vec3 light = lightPosition.xyz;
     vec3 L = normalize( light - pos );
-	
+
     vec3 E = normalize( -pos );
     vec3 H = normalize( L + E );
-    
+
     vec4 NN = vec4(vNormal,0);
 
     // Transform vertex normal into eye coordinates
-       
+
     vec3 N = normalize( (modelViewMatrix*NN).xyz);
 
     // Compute terms in the illumination equation
@@ -133,10 +133,10 @@ void main()
 
     float Ks = pow( max(dot(N, H), 0.0), shininess );
     vec4  specular = Ks * specularProduct;
-    
+
     if( dot(L, N) < 0.0 ) {
 	specular = vec4(0.0, 0.0, 0.0, 1.0);
-    } 
+    }
 
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
     float divideZ = 1.05 + position.z;
@@ -149,7 +149,7 @@ void main()
 }
 `
 
-//fragment shader 
+//fragment shader
 var fragShader = `
 precision mediump float;
 varying vec4 color;
@@ -175,7 +175,7 @@ void main()
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
     vec4 NN = vec4(vNormal,0);
     // Transform vertex normal into eye coordinates
-       
+
     //normalInterp = (modelViewMatrix*NN).xyz;    // assign to 'varying' variable to allow interpolation
     normalInterp = vec3(NN.xyz);
     pos = -(modelViewMatrix * vertexPosition).xyz;
@@ -310,7 +310,7 @@ window.onload = function init() {
 
     //make patch and assign colors
     makeSmallPatches();
-    
+
 
     //make buffers and link them to the program
     vertexBuffer = gl.createBuffer();
@@ -409,26 +409,26 @@ function getPatch(xmin, xmax, zmin, zmax) {
         }
     }
 
-     
+
     for (var k = verticesStart; k < vertices.length; k += 3)
     {
         a = vertices[k];
         b = vertices[k + 1];
         c = vertices[k + 2];
         if (!(a in verticesFaces))
-        {   
+        {
             verticesFaces[a] = []
         }
         verticesFaces[a].push(faceNum)
 
         if (!(b in verticesFaces))
-        {   
+        {
             verticesFaces[b] = []
         }
         verticesFaces[b].push(faceNum)
 
         if (!(c in verticesFaces))
-        {   
+        {
             verticesFaces[c] = []
         }
         verticesFaces[c].push(faceNum)
@@ -436,7 +436,7 @@ function getPatch(xmin, xmax, zmin, zmax) {
 
         faces[faceNum++] = [a,b,c, getNormal(a,b,c)];
         //faces has key = faceNum and key = vertices conntected to it and the normal
-        
+
     }
 
     return verticesStart
@@ -519,7 +519,7 @@ function getNormalAverage(normals)
     }
     if ( !isFinite(length(normal)) ) {
         return vec3()
-    } 
+    }
     return normalize(normal)
 }
 
@@ -579,15 +579,11 @@ function animate(time){
             }
         }
 
-<<<<<<< Updated upstream
-        
-=======
-
         /*
         get transformation matrices corresponding to current coordinates
         and pass to webgl program.
         */
->>>>>>> Stashed changes
+
         projectionMatrix = ortho(left, right, bottom, ytop, near, far);
         modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
         gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
@@ -596,33 +592,31 @@ function animate(time){
         if (viewMode % 3 === 0){ // points
             gl.drawArrays(gl.POINTS, 0, vertices.length);
         }
-    
+
         else if (viewMode % 3 === 1){ //wireframe
             gl.drawArrays(gl.LINES, 0, vertices.length);
         }
         else if (viewMode  % 3 > 1){ // shading involved
             gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
         }
-    
+
     }
     window.requestAnimationFrame(animate);
 }
 
 function enableAllBuffers(){
-    
+
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
     projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
 
-    
-    
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
     var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
 	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vertexPosition );
-    
-    
+
+
     vertexColor = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
@@ -663,7 +657,7 @@ function enablePhongShading(){
 
         vertShdr = createShaderHelper(vertexShaderPhong, true);
         fragShdr = createShaderHelper(fragShaderPhong, false);
-            
+
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
 
@@ -689,7 +683,7 @@ function disablePhongShading(){
 
         vertShdr = createShaderHelper(vertexShader, true);
         fragShdr = createShaderHelper(fragShader, false);
-            
+
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
 
@@ -863,11 +857,11 @@ function getVertexColor(vertex)
 
 function setColors()
 {
-    
+
     for (var k = 0; k < vertices.length; k += 3)
         {
             var r = 0; var g = 0; var b = 0;
-            
+
             for (let i = 0; i < 3; i++)
             {
                 color = getVertexColor(vertices[k + i]);
@@ -898,7 +892,7 @@ function setNormals(){
 
     // vNormal[i] refers to the normal for vertices[i]
     if (normalFlat.length == 0){ // flat shading, Phong shading
-        
+
         // adding Phong here:
         // add Normals at each vertex and interpolate bw them for all vertices between them
         // this interpolation will be done by the varying keyword in GLSL
@@ -911,9 +905,9 @@ function setNormals(){
             {
                 normalFlat.push(faceNormal); //face normal added 3 times for each vertex
             }
-        
+
         }
-        
+
     }
     if (normalSmooth.length == 0){ // smooth shading
         for (let k = 0; k < vertices.length; k++)
@@ -924,23 +918,23 @@ function setNormals(){
             {
                 //normals of all faces assoicated with that normal
                 vertexNormals.push(faces[attachedFaces[i]][3]);
-            }   
+            }
             normalSmooth.push(getNormalAverage(vertexNormals)); //average normal
 
         }
 
-    }   
+    }
 
 
     if (fill % 3 == 0)
     {
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalFlat), gl.STATIC_DRAW);  
-    } 
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalFlat), gl.STATIC_DRAW);
+    }
     else
     {
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalSmooth), gl.STATIC_DRAW);   
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalSmooth), gl.STATIC_DRAW);
     }
 }
 
@@ -979,7 +973,7 @@ function getKeyPress(event){
     else if (event.code === 'KeyC'){ // toggle shade
         fill = fill + 1;
         //colors = setColors(); // sets the colors array
-        setNormals(); //changing normals for the shading 
+        setNormals(); //changing normals for the shading
 
         if (fill % 3 === 2){
             enablePhongShading();
