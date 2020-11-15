@@ -158,59 +158,46 @@ void main()
 }
 `
 
-// vertexShader for Phong shading
 var vertexShaderPhong = `
 attribute vec4 vertexPosition;
 attribute vec4 vertexColor;
 attribute vec3 vNormal;
 uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
-
 varying vec3 normalInterp;
 varying vec3 pos;
 varying vec4 color;
-
 void main()
 {
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
     float divideZ = 1.05 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
-
     vec4 NN = vec4(vNormal,0);
-
     // Transform vertex normal into eye coordinates
        
     //normalInterp = (modelViewMatrix*NN).xyz;    // assign to 'varying' variable to allow interpolation
     normalInterp = vec3(NN.xyz);
     pos = -(modelViewMatrix * vertexPosition).xyz;
-
     color = vertexColor;
 }
 `
 //fragment shader for Phong
 var fragShaderPhong = `
 precision mediump float;
-
 varying vec3 normalInterp;
-
-uniform vec3 ambientLight, diffuseLight, specularLight;
+uniform vec4 ambientProduct, diffuseProduct, specularProduct;
 uniform vec4 lightPosition;
-
 uniform float shininess;
 uniform float Ka;
 uniform float Kd;
 uniform float Ks;
-
 varying vec3 pos;
 varying vec4 color;
-
 void main()
 {
     vec3 N = normalize(normalInterp);
-
     vec3 light = lightPosition.xyz;
     vec3 L = normalize( light - pos );  // light source
-
     // from http://www.cs.toronto.edu/~jacobson/phong-demo/
     // Lambert's cosine law
     float lambertian = max(dot(N, L), 0.0);
@@ -218,15 +205,13 @@ void main()
     if(lambertian > 0.0) {
         vec3 R = reflect(-L, N);      // Reflected light vector
         vec3 V = normalize(-pos); // Vector to viewer
-
         // Compute the specular term
         float specAngle = max(dot(R, V), 0.0);
         specular = pow(specAngle, shininess);
       }
-
-    gl_FragColor = color * vec4(Ka * ambientLight.xyz +
-                        Kd * lambertian * diffuseLight.xyz +
-                        Ks * specular * specularLight.xyz, 1.0);
+    gl_FragColor = color * vec4(Ka * ambientProduct.xyz +
+                        Kd * lambertian * diffuseProduct.xyz +
+                        Ks * specular * specularProduct.xyz, 1.0);
 }
 `
 
@@ -589,40 +574,7 @@ function animate(time){
             }
         }
 
-        //eyeRotated[1] = Math.min(3.5, Math.max(2.5, eyeRotated[1]));
-        //atRotated[1] = Math.min(3.5, Math.max(2.5, atRotated[1]));
-
-
-        /*
-        right_eye = mult(modelViewMatrix, vec4(left, 0, 0, 1))[0];
-        left_eye = mult(modelViewMatrix, vec4(right, 0, 0, 1))[0];
-        console.log(eyeRotated);
-
-
-
-        if ( eyeRotated[0] > maxPatchX){
-            maxPatchX = maxPatchX + 5;
-            newPatch = true;
-        }
-        else if (eyeRotated[0] < maxPatchX - 10){
-            maxPatchX = maxPatchX - 5;
-            newPatch = true;
-        }
-        else if ( eyeRotated[2] + far > maxPatchZ ){
-            maxPatchZ = Math.ceil(maxPatchZ + 5);
-            newPatch = true;
-        }
-
-        if (newPatch) {
-            getPatch(maxPatchX - 10, maxPatchX, maxPatchZ - 10, maxPatchZ);
-            colors = setColors();
-        }
-        */
-
-        /*
-        get transformation matrices corresponding to current coordinates
-        and pass to webgl program.
-        */
+        
         projectionMatrix = ortho(left, right, bottom, ytop, near, far);
         modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
         gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
@@ -636,17 +588,57 @@ function animate(time){
             gl.drawArrays(gl.LINES, 0, vertices.length);
         }
         else if (viewMode  % 3 > 1){ // shading involved
-            if (fill % 4 === 3){
-                enablePhongShading();
-            }
-            else
-                disablePhongShading();
-    
             gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
         }
     
     }
     window.requestAnimationFrame(animate);
+}
+
+function enableAllBuffers(){
+    
+    modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
+    projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
+
+    
+    
+    vertexBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
+    gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
+    var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
+	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
+    gl.enableVertexAttribArray( vertexPosition );
+    
+    
+    vertexColor = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
+    gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
+    var vColor = gl.getAttribLocation(program, "vertexColor");
+    gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vColor);
+
+    //inspired from Anisa recitation
+    normalBuffer = gl.createBuffer();
+    setNormals();
+    var vNormal = gl.getAttribLocation(program, "vNormal");
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    var ambientProduct = mult(lightAmbient, materialAmbient);
+    var diffuseProduct = mult(lightDiffuse, materialDiffuse);
+    var specularProduct = mult(lightSpecular, materialSpecular);
+
+    gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
+        flatten(ambientProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseProduct"),
+        flatten(diffuseProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"),
+        flatten(specularProduct));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
+        flatten(lightPosition));
+
+    gl.uniform1f(gl.getUniformLocation(program,
+            "shininess"), materialShininess);
 }
 
 function enablePhongShading(){
@@ -662,19 +654,17 @@ function enablePhongShading(){
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
 
-        gl.uniform4fv(gl.getUniformLocation(program,
-            "ambientLight"), flatten(lightAmbient));
-        gl.uniform4fv(gl.getUniformLocation(program,
-            "diffuseLight"), flatten(lightDiffuse));
-        gl.uniform4fv(gl.getUniformLocation(program,
-            "specularLight"), flatten(lightSpecular));
+        gl.linkProgram( program );
+        gl.useProgram( program );
 
-        gl.uniform1fv(gl.getUniformLocation(program,
+        gl.uniform1f(gl.getUniformLocation(program,
             "Ka"), ka);
-        gl.uniform1fv(gl.getUniformLocation(program,
+        gl.uniform1f(gl.getUniformLocation(program,
             "Kd"), kd);
-        gl.uniform1fv(gl.getUniformLocation(program,
+        gl.uniform1f(gl.getUniformLocation(program,
             "Ks"), ks);
+
+        enableAllBuffers();
     }
 }
 
@@ -689,6 +679,11 @@ function disablePhongShading(){
             
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
+
+        gl.linkProgram( program );
+        gl.useProgram( program );
+
+        enableAllBuffers();
     }
     phongBool = false;
 }
@@ -884,30 +879,31 @@ function setColors()
 }
 
 
+var normalFlat = []
+var normalSmooth =[]
+
 function setNormals(){
 
     // vNormal[i] refers to the normal for vertices[i]
-    if (fill % 3 == 0){ // flat shading, Phong shading
+    if (normalFlat.length == 0){ // flat shading, Phong shading
         
         // adding Phong here:
         // add Normals at each vertex and interpolate bw them for all vertices between them
         // this interpolation will be done by the varying keyword in GLSL
 
-        vNormals = [];
 
         for (let k = 0; k < faceNum; k++)
         {
             faceNormal = faces[k][3];
             for (let i = 0; i < 3; i++)
             {
-                vNormals.push(faceNormal); //face normal added 3 times for each vertex
+                normalFlat.push(faceNormal); //face normal added 3 times for each vertex
             }
         
         }
         
     }
-    else if (fill % 3 === 1 || fill % 3 === 2){ // smooth shading
-        vNormals = [];
+    if (normalSmooth.length == 0){ // smooth shading
         for (let k = 0; k < vertices.length; k++)
         {
             var vertexNormals = []
@@ -917,14 +913,23 @@ function setNormals(){
                 //normals of all faces assoicated with that normal
                 vertexNormals.push(faces[attachedFaces[i]][3]);
             }   
-            vNormals.push(getNormalAverage(vertexNormals)); //average normal
+            normalSmooth.push(getNormalAverage(vertexNormals)); //average normal
 
         }
 
     }   
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(vNormals), gl.STATIC_DRAW);   
+
+    if (fill % 3 == 0)
+    {
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalFlat), gl.STATIC_DRAW);  
+    } 
+    else
+    {
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalSmooth), gl.STATIC_DRAW);   
+    }
 }
 
 
@@ -963,7 +968,14 @@ function getKeyPress(event){
         fill = fill + 1;
         //colors = setColors(); // sets the colors array
         setNormals(); //changing normals for the shading 
-         
+
+        if (fill % 3 === 2){
+            enablePhongShading();
+        }
+        else
+        {
+            disablePhongShading();
+        }
     }
     else if (event.code === 'KeyV'){ // toggle view
         viewMode += 1;
