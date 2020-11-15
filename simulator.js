@@ -589,6 +589,8 @@ function animate(time){
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         translate(atVector);
 
+
+        checkConstraints();
         if (currentPatch(atRotated) != cPatch) {
             var oPatch = cPatch;
             cPatch = currentPatch(atRotated);
