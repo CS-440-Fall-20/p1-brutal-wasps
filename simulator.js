@@ -139,7 +139,7 @@ void main()
     }
 
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
-    float divideZ = 1.05 + position.z;
+    float divideZ = 1.15 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
 
     color = ambient + diffuse + specular;
@@ -171,7 +171,7 @@ varying vec4 color;
 void main()
 {
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
-    float divideZ = 1.05 + position.z;
+    float divideZ = 1.15 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
     gl_PointSize = 2.0;
     vec4 NN = vec4(vNormal,0);
@@ -542,41 +542,52 @@ function getNormal(a, b, c)
     return normal
 }
 
+var constraintUp = false;
+var constrainDown = false;
+var diffVector = vec3();
+
+
+function checkConstraints(){
+    if (eye[1] > 3.5)
+        {
+            constraintUp = true;
+            diffVector = subtract(at, eye);
+        }
+        else
+        {
+            constraintUp = false;
+        }
+
+        if (eye[1] < 2.5)
+        {
+            constrainDown = true;
+            diffVector = subtract(at, eye);
+        }
+        else
+        {
+            constrainDown = false;
+        }
+
+        if (constraintUp)
+        {
+            eyeRotated[1] = 3.5;
+            eye[1] = 3.5;
+            atRotated[1] = 3.5 + diffVector[1];
+            at[1] = 3.5 + diffVector[1]; 
+        }
+        else if (constrainDown)
+        {
+            eyeRotated[1] = 2.5;
+            eye[1] = 2.5;
+            atRotated[1] = 2.5 + diffVector[1];
+            at[1] = 2.5 + diffVector[1]; 
+        }
+}
+
 function animate(time){
     if (simulatorRunning) {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         translate(atVector);
-
-        // if (atRotated[1] > 3.5)
-        //     atRotated[1] = 3.5;
-        // else (atRotated[1] < 2.5)
-        //     atRotated[1] = 2.5;
-        // if (contrained) {
-        //     atRotated[1] = atRotatedStored
-        //     upRotated[1] = upStored;
-        //     if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5) {
-        //         contrained = false;
-        //     }
-        // }
-
-        // if (eyeRotated[1] < 2.5 && !contrained) {
-        //     lastEye = eyeRotated[1];
-        //     eyeRotated[1] = 2.5;
-        //     atRotatedStored = atRotated[1];
-        //     upStored = upRotated[1];
-        //     contrained = true;
-        //     lastPitch = ourPlane.pitch;
-        // }
-
-        // if (eyeRotated[1] > 3.5 && !contrained) {
-        //     lastEye = eyeRotated[1];
-        //     eyeRotated[1] = 3.5;
-        //     atRotatedStored = atRotated[1];
-        //     upStored = upRotated[1];
-        //     contrained = true;
-        //     lastPitch = ourPlane.pitch;
-        // }
-
 
         if (currentPatch(atRotated) != cPatch) {
             var oPatch = cPatch;
@@ -612,6 +623,7 @@ function animate(time){
     window.requestAnimationFrame(animate);
 }
 
+//helper function for changing buffer and data
 function enableAllBuffers(){
 
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
@@ -623,7 +635,6 @@ function enableAllBuffers(){
     var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
 	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vertexPosition );
-
 
     vertexColor = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
@@ -651,11 +662,12 @@ function enableAllBuffers(){
         flatten(specularProduct));
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"),
         flatten(lightPosition));
-
     gl.uniform1f(gl.getUniformLocation(program,
             "shininess"), materialShininess);
 }
 
+
+//enables phong shaders
 function enablePhongShading(){
     if (!phongBool){
         console.log(ka + " " + kd + " " + ks);
@@ -683,6 +695,7 @@ function enablePhongShading(){
     }
 }
 
+//enables the default shader
 function disablePhongShading(){
     if (phongBool){
         console.log("disabled")
@@ -704,6 +717,8 @@ function disablePhongShading(){
 }
 
 
+
+//detects whether two patches lie in the same in the terrain
 function shareRow(patch1, patch2) {
     var a = BOTTOMROW.includes(patch1) && BOTTOMROW.includes(patch2);
     var b = MIDDLEROW.includes(patch1) && MIDDLEROW.includes(patch2);
@@ -711,8 +726,11 @@ function shareRow(patch1, patch2) {
     return a || b || c
 }
 
+
+//deals when patch is changed. Adds new patches to give infinite terrain affect.
 function changeOfPatch(oPatch, newPatch) {
     if (shareRow(oPatch, newPatch)) {
+        //if the new patch is in left column, add the right most patch to the left.
         if (LEFTCOL.includes(newPatch)) {
             translatePatches(RIGHTCOL, 30, 0);
             oldRight = RIGHTCOL; oldMiddle = MIDDLECOL; oldLeft = LEFTCOL;
@@ -751,6 +769,8 @@ function changeOfPatch(oPatch, newPatch) {
     }
 }
 
+
+//translate constructed patches to give illustion of infinite terrain patch
 function translatePatches(patchesNum, tx, tz) {
     for (let i = 0; i < patchesNum.length; i++) {
 
@@ -762,18 +782,21 @@ function translatePatches(patchesNum, tx, tz) {
             vertices[index][2] += tz;
         }
 
+        //alter boundaries
         patchBoundaries[patchesNum[i]][0] += tx;
         patchBoundaries[patchesNum[i]][1] += tx;
         patchBoundaries[patchesNum[i]][2] += tz;
         patchBoundaries[patchesNum[i]][3] += tz;
     }
 
+    //replace data in the buffer
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferSubData( gl.ARRAY_BUFFER, 0, flatten(vertices));
 }
 
+
 var patchBoundaries = [];
-var patchOffset = []
+var patchOffset = [] //erray to store where each patch begins in vertex buffer
 
 var LEFTCOL = [2, 5, 8];
 var RIGHTCOL = [0, 3, 6];
@@ -783,6 +806,7 @@ var BOTTOMROW = [0, 1, 2];
 var MIDDLEROW = [3, 4, 5];
 var TOPROW = [6, 7, 8];
 
+//generates a set of 3 x 3 mini patches
 function makeSmallPatches() {
     p1 = [-15, -5, -15, -5];
     patchBoundaries.push(p1);
@@ -819,9 +843,9 @@ function makeSmallPatches() {
 
 }
 
-function currentPatch(currentPos)
-{
 
+//determining current patch of eye
+function currentPatch(currentPos){
     x = currentPos[0];
     z = currentPos[2];
 
@@ -839,8 +863,9 @@ function currentPatch(currentPos)
     return -1;
 }
 
-function getVertexColor(vertex)
-{
+
+//given a vertex, returns it color based on height
+function getVertexColor(vertex){
     if (vertex[1] > 1.22)
     {
         color = WHITE;
@@ -863,6 +888,8 @@ function getVertexColor(vertex)
 }
 
 
+
+//sets the color array for all vertices
 function setColors()
 {
 
@@ -896,16 +923,11 @@ function setColors()
 var normalFlat = []
 var normalSmooth =[]
 
+
+//computes normals and puts in the respective array
 function setNormals(){
 
-    // vNormal[i] refers to the normal for vertices[i]
-    if (normalFlat.length == 0){ // flat shading, Phong shading
-
-        // adding Phong here:
-        // add Normals at each vertex and interpolate bw them for all vertices between them
-        // this interpolation will be done by the varying keyword in GLSL
-
-
+    if (normalFlat.length == 0){ // flat shading,
         for (let k = 0; k < faceNum; k++)
         {
             faceNormal = faces[k][3];
@@ -933,7 +955,7 @@ function setNormals(){
 
     }
 
-
+    //changes data in the buffer
     if (fill % 3 == 0)
     {
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
@@ -945,6 +967,8 @@ function setNormals(){
         gl.bufferData(gl.ARRAY_BUFFER, flatten(normalSmooth), gl.STATIC_DRAW);
     }
 }
+
+
 
 
 function getKeyPress(event){
@@ -1000,13 +1024,13 @@ function getKeyPress(event){
              event.code === 'KeyE' || event.code === 'KeyA' ||
              event.code === 'KeyD' || event.code === 'KeyQ' ){
 
-        if (event.code === 'KeyW' && ourPlane.pitch < 89.5) {
+        if (event.code === 'KeyW' && ourPlane.pitch < 89.5 && !constraintUp) {
             ourPlane.pitch += 0.5;
             ourPlane.pitchRotate = 0.5;
             getRotations();
         }
 
-        else if (event.code === 'KeyS' && ourPlane.pitch > -90.5) { //
+        else if (event.code === 'KeyS' && ourPlane.pitch > -90.5 && !constrainDown) { //
             ourPlane.pitch -= 0.5;
             ourPlane.pitchRotate = -0.5;
             getRotations();
