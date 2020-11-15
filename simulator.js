@@ -972,22 +972,22 @@ function setNormals(){
 
 
 function getKeyPress(event){
-    if (event.code === 'Numpad4' && left > -5 && right > 0){ // left
+    if (event.code === 'Numpad1' && left > -5 && right > 0){ // left
         left = left - speed;
         right = right - speed;
     }
 
-    else if (event.code === 'Numpad6' && left < 0 && right < 5){ // right
+    else if (event.code === 'Numpad2' && left < 0 && right < 5){ // right
         left = left + speed;
         right = right + speed;
     }
 
-    else if (event.code === 'Numpad8' && ytop < 1.5 && bottom < -2 ){ // up
+    else if (event.code === 'Numpad3' && ytop < 1.5 && bottom < -2 ){ // up
         ytop = ytop + speed;
         bottom = bottom + speed;
     }
 
-    else if (event.code === 'Numpad2' && ytop > -1.5 && bottom > -4){ // down
+    else if (event.code === 'Numpad4' && ytop > -1.5 && bottom > -4){ // down
         ytop = ytop - speed;
         bottom = bottom - speed;
     }
@@ -997,7 +997,7 @@ function getKeyPress(event){
         far = far - speed;
     }
 
-    else if (event.code === 'Numpad0' && near < -4 && far < 6){ // far
+    else if (event.code === 'Numpad6' && near < -4 && far < 6){ // far
         near = near + speed;
         far = far + speed;
     }
