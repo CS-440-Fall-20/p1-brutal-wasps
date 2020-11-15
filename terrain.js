@@ -192,10 +192,14 @@ function getPatch(xmin, xmax, zmin, zmax)
 		{
             //scale = Math.min(Math.min(Math.abs(x - xmax), Math.abs(x - xmin)), Math.min(Math.abs(z - zmax), Math.abs(z - zmin)));
             //scale = Math.min(2, scale)
-            let a = vec4(x, noise.perlin2(x, z) * 2, z, 1.0);
-            let b = vec4(x + scl, noise.perlin2(x + scl, z) * 2, z, 1.0);
-            let c = vec4(x, noise.perlin2(x, z + scl) * 2, z + scl, 1.0);
-            let d = vec4(x + scl, noise.perlin2(x + scl, z + scl) * 2, z + scl, 1.0);
+            var factor = closeToEdge(x, z, xmin, xmax, zmin, zmax, 2)
+            let a = vec4(x, noise.perlin2(x, z) * factor, z, 1.0);
+            factor = closeToEdge(x + scl, z, xmin, xmax, zmin, zmax, 2)
+            let b = vec4(x + scl, noise.perlin2(x + scl, z) * factor, z, 1.0);
+            factor = closeToEdge(x, z+scl, xmin, xmax, zmin, zmax, 2)
+            let c = vec4(x, noise.perlin2(x, z + scl) * factor, z + scl, 1.0);
+            factor = closeToEdge(x + scl, z + scl, xmin, xmax, zmin, zmax, 2)
+            let d = vec4(x + scl, noise.perlin2(x + scl, z + scl) * factor, z + scl, 1.0);
             if (a[1] > 1.7) console.log(a);
             vertices.push(a); vertices.push(b); vertices.push(c);
             vertices.push(add(d, vec4(0,0,0,0))); vertices.push(add(b, vec4(0,0,0,0))); vertices.push(add(c, vec4(0,0,0,0)));
@@ -205,17 +209,19 @@ function getPatch(xmin, xmax, zmin, zmax)
     return verticesStart
 }
 
-function closeToEdge(x, z, xmin, xmas, zmin, zmax, threshold)
+function closeToEdge(x, z, xmin, xmax, zmin, zmax, threshold)
 {
+    var xDiff = 2;
+    var zDiff = 2;
     if (Math.abs(x - xmin) <= threshold || Math.abs(x - xmax) <= threshold)
     {
-        return true;
+        xDiff =Math.min(Math.abs(x - xmin),Math.abs(x - xmax))
     }
     if (Math.abs(z - zmin) <= threshold || Math.abs(z - zmax) <= threshold)
     {
-        return true;
+        zDiff =  Math.min(Math.abs(z - zmin), Math.abs(z - zmax));
     }
-    return false;
+    return Math.min(Math.min(xDiff, zDiff), 2);
 
 }
 
