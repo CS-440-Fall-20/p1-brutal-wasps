@@ -5,6 +5,7 @@ var vertexBuffer;
 var vertexColor;
 var vertexPosition;
 var ourAudio;
+var accAudio;
 var points = [];
 var colors = [];
 var vertices = [];
@@ -109,19 +110,19 @@ void main()
     //code copy pasted from Anisa's recitation
 
     vec3 pos = -(modelViewMatrix * vertexPosition).xyz;
-    
+
     //fixed light postion
-    
+
     vec3 light = lightPosition.xyz;
     vec3 L = normalize( light - pos );
-	
+
     vec3 E = normalize( -pos );
     vec3 H = normalize( L + E );
-    
+
     vec4 NN = vec4(vNormal,0);
 
     // Transform vertex normal into eye coordinates
-       
+
     vec3 N = normalize( (modelViewMatrix*NN).xyz);
 
     // Compute terms in the illumination equation
@@ -132,10 +133,10 @@ void main()
 
     float Ks = pow( max(dot(N, H), 0.0), shininess );
     vec4  specular = Ks * specularProduct;
-    
+
     if( dot(L, N) < 0.0 ) {
 	specular = vec4(0.0, 0.0, 0.0, 1.0);
-    } 
+    }
 
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
     float divideZ = 1.05 + position.z;
@@ -148,7 +149,7 @@ void main()
 }
 `
 
-//fragment shader 
+//fragment shader
 var fragShader = `
 precision mediump float;
 varying vec4 color;
@@ -172,9 +173,10 @@ void main()
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
     float divideZ = 1.05 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
+    gl_PointSize = 2.0;
     vec4 NN = vec4(vNormal,0);
     // Transform vertex normal into eye coordinates
-       
+
     //normalInterp = (modelViewMatrix*NN).xyz;    // assign to 'varying' variable to allow interpolation
     normalInterp = vec3(NN.xyz);
     pos = -(modelViewMatrix * vertexPosition).xyz;
@@ -250,8 +252,8 @@ inspired from https://www.w3schools.com/graphics/game_sound.asp
 handles the audio. Playing/pausing audio is mapped to key P on the keyboard
 */
 class Sound {
-    constructor(src) {
-        this.sound = document.getElementById("myAudio");
+    constructor(src, element) {
+        this.sound = document.getElementById(element);
         this.sound.src = src;
         this.playing = true;
     }
@@ -278,7 +280,10 @@ window.onload = function init() {
 
     //add sound
     try {
-        ourAudio = new Sound("verysad.mp3");
+        ourAudio = new Sound("verysad.mp3", "myAudio");
+        accAudio = new Sound("accident.mp3", "accAudio");
+        accAudio.sound.autoplay = false;
+        accAudio.playing = false;
     }
     catch(err){
         console.log("music file not available");
@@ -307,7 +312,7 @@ window.onload = function init() {
 
     //make patch and assign colors
     makeSmallPatches();
-    
+
 
     //make buffers and link them to the program
     vertexBuffer = gl.createBuffer();
@@ -352,9 +357,8 @@ window.onload = function init() {
     animate(0);
 }
 
-//to map the color of the faces
-function mapPoint(P, Q, X, A, B)
-{
+//to map the color of the vertices according to its y value
+function mapPoint(P, Q, X, A, B) {
     var alpha = (((Q-P)*(Q-P) > 0 ) ? (X - P)/(Q - P) : 0);
     var result;
 
@@ -373,16 +377,14 @@ function mapPoint(P, Q, X, A, B)
 }
 
 //helpder function to create shaders
-function createShaderHelper(sourceString, vertex = true)
-{
+function createShaderHelper(sourceString, vertex = true) {
     var shader = ((vertex) ? gl.createShader( gl.VERTEX_SHADER ) : gl.createShader( gl.FRAGMENT_SHADER ));
     gl.shaderSource( shader, sourceString );
     gl.compileShader( shader );
     return shader;
 }
 
-function getPatch(xmin, xmax, zmin, zmax)
-{
+function getPatch(xmin, xmax, zmin, zmax) {
     //length of side of each triangle
     var scl = 0.1;
 
@@ -417,19 +419,19 @@ function getPatch(xmin, xmax, zmin, zmax)
         b = vertices[k + 1];
         c = vertices[k + 2];
         if (!(a in verticesFaces))
-        {   
+        {
             verticesFaces[a] = []
         }
         verticesFaces[a].push(faceNum)
 
         if (!(b in verticesFaces))
-        {   
+        {
             verticesFaces[b] = []
         }
         verticesFaces[b].push(faceNum)
 
         if (!(c in verticesFaces))
-        {   
+        {
             verticesFaces[c] = []
         }
         verticesFaces[c].push(faceNum)
@@ -437,7 +439,7 @@ function getPatch(xmin, xmax, zmin, zmax)
 
         faces[faceNum++] = [a,b,c, getNormal(a,b,c)];
         //faces has key = faceNum and key = vertices conntected to it and the normal
-        
+
     }
 
     return verticesStart
@@ -482,7 +484,6 @@ function translate(axis){
     }
 
     atRotated = at;
-    upRotated = up;
     eyeRotated = eye;
 }
 
@@ -511,6 +512,7 @@ function getRotations(){
 
     atRotated = add(atVector, eye);
     up = upVector;
+    upRotated = up;
 }
 
 //computes average normalized normals acc to page 295
@@ -523,7 +525,7 @@ function getNormalAverage(normals)
     }
     if ( !isFinite(length(normal)) ) {
         return vec3()
-    } 
+    }
     return normalize(normal)
 }
 
@@ -545,31 +547,35 @@ function animate(time){
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         translate(atVector);
 
-        if (contrained) {
-            atRotated[1] = atRotatedStored
-            upRotated[1] = upStored;
-            if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5) {
-                contrained = false;
-            }
-        }
+        // if (atRotated[1] > 3.5)
+        //     atRotated[1] = 3.5;
+        // else (atRotated[1] < 2.5)
+        //     atRotated[1] = 2.5;
+        // if (contrained) {
+        //     atRotated[1] = atRotatedStored
+        //     upRotated[1] = upStored;
+        //     if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5) {
+        //         contrained = false;
+        //     }
+        // }
 
-        if (eyeRotated[1] < 2.5 && !contrained) {
-            lastEye = eyeRotated[1];
-            eyeRotated[1] = 2.5;
-            atRotatedStored = atRotated[1];
-            upStored = upRotated[1];
-            contrained = true;
-            lastPitch = ourPlane.pitch;
-        }
+        // if (eyeRotated[1] < 2.5 && !contrained) {
+        //     lastEye = eyeRotated[1];
+        //     eyeRotated[1] = 2.5;
+        //     atRotatedStored = atRotated[1];
+        //     upStored = upRotated[1];
+        //     contrained = true;
+        //     lastPitch = ourPlane.pitch;
+        // }
 
-        if (eyeRotated[1] > 3.5 && !contrained) {
-            lastEye = eyeRotated[1];
-            eyeRotated[1] = 3.5;
-            atRotatedStored = atRotated[1];
-            upStored = upRotated[1];
-            contrained = true;
-            lastPitch = ourPlane.pitch;
-        }
+        // if (eyeRotated[1] > 3.5 && !contrained) {
+        //     lastEye = eyeRotated[1];
+        //     eyeRotated[1] = 3.5;
+        //     atRotatedStored = atRotated[1];
+        //     upStored = upRotated[1];
+        //     contrained = true;
+        //     lastPitch = ourPlane.pitch;
+        // }
 
 
         if (currentPatch(atRotated) != cPatch) {
@@ -581,7 +587,11 @@ function animate(time){
             }
         }
 
-        
+        /*
+        get transformation matrices corresponding to current coordinates
+        and pass to webgl program.
+        */
+
         projectionMatrix = ortho(left, right, bottom, ytop, near, far);
         modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
         gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
@@ -590,20 +600,20 @@ function animate(time){
         if (viewMode % 3 === 0){ // points
             gl.drawArrays(gl.POINTS, 0, vertices.length);
         }
-    
+
         else if (viewMode % 3 === 1){ //wireframe
             gl.drawArrays(gl.LINES, 0, vertices.length);
         }
         else if (viewMode  % 3 > 1){ // shading involved
             gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
         }
-    
+
     }
     window.requestAnimationFrame(animate);
 }
 
 function enableAllBuffers(){
-    
+
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
     projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
     
@@ -613,8 +623,8 @@ function enableAllBuffers(){
     var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
 	gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vertexPosition );
-    
-    
+
+
     vertexColor = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
@@ -655,7 +665,7 @@ function enablePhongShading(){
 
         vertShdr = createShaderHelper(vertexShaderPhong, true);
         fragShdr = createShaderHelper(fragShaderPhong, false);
-            
+
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
 
@@ -681,7 +691,7 @@ function disablePhongShading(){
 
         vertShdr = createShaderHelper(vertexShader, true);
         fragShdr = createShaderHelper(fragShader, false);
-            
+
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
 
@@ -773,8 +783,7 @@ var BOTTOMROW = [0, 1, 2];
 var MIDDLEROW = [3, 4, 5];
 var TOPROW = [6, 7, 8];
 
-function makeSmallPatches()
-{
+function makeSmallPatches() {
     p1 = [-15, -5, -15, -5];
     patchBoundaries.push(p1);
 
@@ -856,11 +865,11 @@ function getVertexColor(vertex)
 
 function setColors()
 {
-    
+
     for (var k = 0; k < vertices.length; k += 3)
         {
             var r = 0; var g = 0; var b = 0;
-            
+
             for (let i = 0; i < 3; i++)
             {
                 color = getVertexColor(vertices[k + i]);
@@ -891,7 +900,7 @@ function setNormals(){
 
     // vNormal[i] refers to the normal for vertices[i]
     if (normalFlat.length == 0){ // flat shading, Phong shading
-        
+
         // adding Phong here:
         // add Normals at each vertex and interpolate bw them for all vertices between them
         // this interpolation will be done by the varying keyword in GLSL
@@ -904,9 +913,9 @@ function setNormals(){
             {
                 normalFlat.push(faceNormal); //face normal added 3 times for each vertex
             }
-        
+
         }
-        
+
     }
     if (normalSmooth.length == 0){ // smooth shading
         for (let k = 0; k < vertices.length; k++)
@@ -917,23 +926,23 @@ function setNormals(){
             {
                 //normals of all faces assoicated with that normal
                 vertexNormals.push(faces[attachedFaces[i]][3]);
-            }   
+            }
             normalSmooth.push(getNormalAverage(vertexNormals)); //average normal
 
         }
 
-    }   
+    }
 
 
     if (fill % 3 == 0)
     {
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalFlat), gl.STATIC_DRAW);  
-    } 
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalFlat), gl.STATIC_DRAW);
+    }
     else
     {
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalSmooth), gl.STATIC_DRAW);   
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(normalSmooth), gl.STATIC_DRAW);
     }
 }
 
@@ -972,7 +981,7 @@ function getKeyPress(event){
     else if (event.code === 'KeyC'){ // toggle shade
         fill = fill + 1;
         //colors = setColors(); // sets the colors array
-        setNormals(); //changing normals for the shading 
+        setNormals(); //changing normals for the shading
 
         if (fill % 3 === 2){
             enablePhongShading();
@@ -991,15 +1000,13 @@ function getKeyPress(event){
              event.code === 'KeyE' || event.code === 'KeyA' ||
              event.code === 'KeyD' || event.code === 'KeyQ' ){
 
-        if (event.code === 'KeyW' && (!contrained || eyeRotated[1] === 3.5)
-                && ourPlane.pitch < 89.5) {
+        if (event.code === 'KeyW' && ourPlane.pitch < 89.5) {
             ourPlane.pitch += 0.5;
             ourPlane.pitchRotate = 0.5;
             getRotations();
         }
 
-        else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)
-                && ourPlane.pitch > -90.5) { //
+        else if (event.code === 'KeyS' && ourPlane.pitch > -90.5) { //
             ourPlane.pitch -= 0.5;
             ourPlane.pitchRotate = -0.5;
             getRotations();
@@ -1033,10 +1040,24 @@ function getKeyPress(event){
 
     else if (event.keyCode === 38){ //increase speed
         ourPlane.speed = Math.min(ourPlane.speed + 0.01, ourPlane.maxSpeed);
+        if (ourPlane.speed > ourPlane.maxSpeed/3){
+            if (!accAudio.playing) {
+                accAudio.sound.play();
+                accAudio.playing = true;
+                ourAudio.tuneAudio();
+            }
+        }
     }
 
     else if (event.keyCode === 40){ //decrease speed
         ourPlane.speed = Math.max(ourPlane.speed - 0.01, ourPlane.minSpeed);
+        if (ourPlane.speed < ourPlane.maxSpeed/3){
+            if (accAudio.playing) {
+                accAudio.sound.pause();
+                ourAudio.tuneAudio();
+                accAudio.playing = false;
+            }
+        }
     }
 
     else if (event.keyCode === 27) { //escape key. pauses simulator
