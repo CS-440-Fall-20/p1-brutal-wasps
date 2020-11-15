@@ -1,4 +1,4 @@
-var running = true;
+var simulatorRunning = true;
 var gl;
 var colorBuffer;
 var vertexBuffer;
@@ -7,34 +7,37 @@ var vertexPosition;
 var ourAudio;
 var points = [];
 var colors = [];
-var points1 = [];
 var vertices = [];
+
+//vertices and points added when generated patch
+var verticesAdded = 0;
+var pointsAdded = 0;
+
+//transformation matrices
 var rotationMatrix = mat4();
-var rotationMatrix1 = mat4();
 var modelViewMatrix = mat4();
 var projectionMatrix = mat4();
+
+//vectors defining the camera axes
 var upVector;
 var atVector;
 var perpendicular;
 
-var newPatch = true;
-var verticesAdded = 0;
-var pointsAdded = 0;
-
-var x_pos = 0;
-var y_pos = 3;
-var z_pos = 0;
+//defining initial position of camera
+var xPos = 0;
+var yPos = 3;
+var zPos = 0;
 var diff = 1;
-var mov_speed = 0.01;
-var at = vec3(x_pos, y_pos, z_pos);
+var at = vec3(xPos, yPos, zPos);
 var up = vec3(0, 1, 0);
-var eye = vec3(x_pos, y_pos, z_pos - diff);
+var eye = vec3(xPos, yPos, zPos - diff);
 
 const WHITE = vec4(1, 1, 1, 1);
 const BLUE = vec4(0, 0, 1, 1);
 const GREEN = vec4(0, 1, 0, 1);
 const BROWN = vec4(210/255, 105/255, 30/255, 1);
-// adding ortho params that can be altered
+
+// ortho params that can be altered
 var left = -2.5;
 var right = 2.5;
 var ytop = 0.5;
@@ -49,15 +52,15 @@ var maxPatchZ = 15;
 // camera movement speed
 var speed = 0.05;
 
+// unifrom's location webgl program
 var modelViewMatrixLoc;
 var projectionMatrixLoc;
-var rotationMatrixLoc;
+
 var fill = 1;
 
-// get key press event listener
+// get key up and down event listener
 document.addEventListener('keydown', getKeyPress);
 document.addEventListener("keyup", getKeyUp);
-//document.addEventListener("keydown", getKeyPress);
 
 //vertex shader
 var vertexShader = `
@@ -86,12 +89,22 @@ void main()
 }
 `
 
+/* Plane class
+roll, pitch, yaw are current orientations of plane
+whereas maximum speed is the max speed the plane can fly at
+*/
 class Plane {
     constructor(roll, pitch, yaw, maxSpeed) {
         this.roll = roll;
         this.pitch = pitch;
         this.yaw = yaw;
 
+        /*
+        in each iteration these are either 0.5, 0.0 or -0.5
+        depending on which direction the user wants to rotate (0.5 or -0.5)
+        or not at all (0). 0.5 signifies the angle of rotation corresponding
+        to one single rotation.
+        */
         this.yawRotate = 0.0;
         this.rollRotate = 0.0;
         this.pitchRotate = 0.0;
@@ -102,37 +115,41 @@ class Plane {
     }
 }
 
+//all angles are zero and max speed is 0.1
 let ourPlane = new Plane(0, 0, 0, 0.1);
 
-//inspired from https://www.w3schools.com/graphics/game_sound.asp
+/*
+inspired from https://www.w3schools.com/graphics/game_sound.asp
+handles the audio. Playing/pausing audio is mapped to key P on the keyboard
+*/
 class Sound {
-    constructor(src){
+    constructor(src) {
         this.sound = document.getElementById("myAudio");
         this.sound.src = src;
         this.playing = true;
     }
 
-    tuneAudio(){
-        if (this.playing){
+    //If already playing, pause otherwise play
+    tuneAudio() {
+        if (this.playing) {
             this.playing = false;
             this.sound.pause();
         }
-        else{
+        else {
             this.sound.play();
             this.playing = true;
         }
     }
 }
 
-window.onload = function init()
-{
+window.onload = function init() {
     var canvas = document.getElementById( "gl-canvas" );
     gl = canvas.getContext("webgl");
-    if ( !gl )
-	{
+    if ( !gl ) {
         alert( "WebGL isn't available" );
     }
 
+    //add sound
     try {
         ourAudio = new Sound("verysad.mp3");
     }
@@ -140,6 +157,9 @@ window.onload = function init()
         console.log("music file not available");
     }
 
+    /*
+    configuring the webgl program and adding shaders
+    */
     var program = gl.createProgram();
     var vertShdr = createShaderHelper(vertexShader, true);
     var fragShdr = createShaderHelper(fragShader, false);
@@ -154,19 +174,22 @@ window.onload = function init()
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
 
+    //location of uniform transformation matrices in webgl program
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
     projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
 
+    //make patch and assign colors
     makeSmallPatches();
     colors = setColors();
+
+    //make buffers and link them to the program
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferData( gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW );
-
     var vertexPosition = gl.getAttribLocation( program, "vertexPosition" );
-
     gl.vertexAttribPointer( vertexPosition, 4, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vertexPosition );
+
     vertexColor = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
@@ -174,26 +197,24 @@ window.onload = function init()
     gl.vertexAttribPointer(vColor, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vColor);
 
-    //render()
+    //set initial camera vectors, defaults all angles to 0.
     getRotations();
     animate(0);
 }
 
+//to map the color of the faces
 function mapPoint(P, Q, X, A, B)
 {
     var alpha = (((Q-P)*(Q-P) > 0 ) ? (X - P)/(Q - P) : 0);
     var result;
 
-	if (typeof P == "number" && typeof A == "number")
-	{
+	if (typeof P == "number" && typeof A == "number") {
         result = alpha*B + (1 - alpha)*A;
     }
 
-	else
-	{
+    else {
         result = [];
-        for (let i = 0; i < A.length; i++)
-		{
+        for (let i = 0; i < A.length; i++) {
             result.push(alpha*B[i] + (1 - alpha)*A[i])
         }
     }
@@ -201,6 +222,7 @@ function mapPoint(P, Q, X, A, B)
     return result
 }
 
+//helpder function to create shaders
 function createShaderHelper(sourceString, vertex = true)
 {
     var shader = ((vertex) ? gl.createShader( gl.VERTEX_SHADER ) : gl.createShader( gl.FRAGMENT_SHADER ));
@@ -209,18 +231,21 @@ function createShaderHelper(sourceString, vertex = true)
     return shader;
 }
 
-var scl = 0.1;
-
-noise.seed(Math.random()*65000);
 function getPatch(xmin, xmax, zmin, zmax)
 {
+    //length of side of each triangle
+    var scl = 0.1;
+
+    //seeding the noise function to generate random terrain
+    noise.seed(Math.random());
+
+    /*
+    generates the terrain. Close to Edge function is used to
+    handle the boundary values close to edge of the terrain
+    */
     verticesStart = vertices.length;
-    for (let z = zmin; z < zmax; z += scl)
-	{
-        for (let x = xmin; x < xmax; x += scl)
-		{
-            //scale = Math.min(Math.min(Math.abs(x - xmax), Math.abs(x - xmin)), Math.min(Math.abs(z - zmax), Math.abs(z - zmin)));
-            //scale = Math.min(2, scale)
+    for (let z = zmin; z < zmax; z += scl) {
+        for (let x = xmin; x < xmax; x += scl) {
             var factor = closeToEdge(x, z, xmin, xmax, zmin, zmax, 2)
             let a = vec4(x, noise.perlin2(x, z) * factor, z, 1.0);
             factor = closeToEdge(x + scl, z, xmin, xmax, zmin, zmax, 2)
@@ -229,7 +254,6 @@ function getPatch(xmin, xmax, zmin, zmax)
             let c = vec4(x, noise.perlin2(x, z + scl) * factor, z + scl, 1.0);
             factor = closeToEdge(x + scl, z + scl, xmin, xmax, zmin, zmax, 2)
             let d = vec4(x + scl, noise.perlin2(x + scl, z + scl) * factor, z + scl, 1.0);
-            if (a[1] > 1.7) console.log(a);
             vertices.push(a); vertices.push(b); vertices.push(c);
             vertices.push(add(d, vec4(0,0,0,0))); vertices.push(add(b, vec4(0,0,0,0))); vertices.push(add(c, vec4(0,0,0,0)));
         }
@@ -238,20 +262,21 @@ function getPatch(xmin, xmax, zmin, zmax)
     return verticesStart
 }
 
-function closeToEdge(x, z, xmin, xmax, zmin, zmax, threshold)
-{
+function closeToEdge(x, z, xmin, xmax, zmin, zmax, threshold){
     var xDiff = 2;
     var zDiff = 2;
+
     if (Math.abs(x - xmin) <= threshold || Math.abs(x - xmax) <= threshold)
     {
-        xDiff =Math.min(Math.abs(x - xmin),Math.abs(x - xmax))
+        xDiff = Math.min(Math.abs(x - xmin),Math.abs(x - xmax))
     }
+
     if (Math.abs(z - zmin) <= threshold || Math.abs(z - zmax) <= threshold)
     {
-        zDiff =  Math.min(Math.abs(z - zmin), Math.abs(z - zmax));
+        zDiff = Math.min(Math.abs(z - zmin), Math.abs(z - zmax));
     }
-    return Math.min(Math.min(xDiff, zDiff), 2);
 
+    return Math.min(Math.min(xDiff, zDiff), 2);
 }
 
 var atRotatedStored;
@@ -262,8 +287,12 @@ var lastEye;
 var lastPitch;
 var cPatch = -1;
 
+/*
+translates the eye and at vectors along the
+new axis of translation, that is, the camera's new
+z-axis (which is simply the rotated at vector)
+*/
 function translate(axis){
-
     for (var i = 0; i < axis.length; i++) {
         eye[i] += ourPlane.speed * axis[i];
         at[i] = atRotated[i] + ourPlane.speed * axis[i];
@@ -274,6 +303,7 @@ function translate(axis){
     eyeRotated = eye;
 }
 
+//rotate the camera axes to generate rotated camera vectors
 function getRotations(){
     upVector = up;
     atVector = subtract(at, eye);
@@ -300,24 +330,20 @@ function getRotations(){
     up = upVector;
 }
 
-function animate(time)
-{
-    if (running) {
+function animate(time){
+    if (simulatorRunning) {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         translate(atVector);
 
-        if (contrained)
-        {
+        if (contrained) {
             atRotated[1] = atRotatedStored
             upRotated[1] = upStored;
-            if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5)
-            {
+            if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5) {
                 contrained = false;
             }
         }
 
-        if (eyeRotated[1] < 2.5 && !contrained)
-        {
+        if (eyeRotated[1] < 2.5 && !contrained) {
             lastEye = eyeRotated[1];
             eyeRotated[1] = 2.5;
             atRotatedStored = atRotated[1];
@@ -326,8 +352,7 @@ function animate(time)
             lastPitch = ourPlane.pitch;
         }
 
-        if (eyeRotated[1] > 3.5 && !contrained)
-        {
+        if (eyeRotated[1] > 3.5 && !contrained) {
             lastEye = eyeRotated[1];
             eyeRotated[1] = 3.5;
             atRotatedStored = atRotated[1];
@@ -337,8 +362,7 @@ function animate(time)
         }
 
 
-        if (currentPatch(atRotated) != cPatch)
-        {
+        if (currentPatch(atRotated) != cPatch) {
             var oPatch = cPatch;
             cPatch = currentPatch(atRotated);
             if (oPatch != -1)
@@ -376,24 +400,24 @@ function animate(time)
             colors = setColors();
         }
         */
+
+        /*
+        get transformation matrices corresponding to current coordinates
+        and pass to webgl program.
+        */
         projectionMatrix = ortho(left, right, bottom, ytop, near, far);
         modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
-
-
         gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
         gl.uniformMatrix4fv( projectionMatrixLoc, false, flatten(projectionMatrix) );
-
-        //gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
-        // the variable 'colors' will always have the active shading scheme colors
-        //gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
-
 
         if (fill % 4 === 0){ // points
             gl.drawArrays( gl.POINTS, 0, vertices.length );
         }
+
         else if (fill % 4 === 1){ // wireframe
             gl.drawArrays( gl.LINES, 0, vertices.length );
         }
+
         else if (fill  % 4 > 0){ // shading involved
             gl.drawArrays( gl.TRIANGLES, 0, vertices.length );
         }
@@ -401,130 +425,118 @@ function animate(time)
     window.requestAnimationFrame(animate);
 }
 
-function shareRow(patch1, patch2)
-{
-    var a = BOTTOM_ROW.includes(patch1) && BOTTOM_ROW.includes(patch2);
-    var b = MIDDLE_ROW.includes(patch1) && MIDDLE_ROW.includes(patch2);
-    var c = TOP_ROW.includes(patch1) && TOP_ROW.includes(patch2);
+function shareRow(patch1, patch2) {
+    var a = BOTTOMROW.includes(patch1) && BOTTOMROW.includes(patch2);
+    var b = MIDDLEROW.includes(patch1) && MIDDLEROW.includes(patch2);
+    var c = TOPROW.includes(patch1) && TOPROW.includes(patch2);
     return a || b || c
 }
 
-function changeOfPatch(oPatch, newPatch)
-{
-    if (shareRow(oPatch, newPatch))
-    {
-        if (LEFT_COL.includes(newPatch))
-        {
-            translatePatches(RIGHT_COL, 30, 0);
-            oldRight = RIGHT_COL; oldMiddle = MIDDLE_COL; oldLeft = LEFT_COL;
-            MIDDLE_COL = oldLeft;
-            RIGHT_COL = oldMiddle;
-            LEFT_COL = oldRight;
+function changeOfPatch(oPatch, newPatch) {
+    if (shareRow(oPatch, newPatch)) {
+        if (LEFTCOL.includes(newPatch)) {
+            translatePatches(RIGHTCOL, 30, 0);
+            oldRight = RIGHTCOL; oldMiddle = MIDDLECOL; oldLeft = LEFTCOL;
+            MIDDLECOL = oldLeft;
+            RIGHTCOL = oldMiddle;
+            LEFTCOL = oldRight;
         }
-        if (RIGHT_COL.includes(newPatch))
-        {
-            translatePatches(LEFT_COL, -30, 0);
-            oldRight = RIGHT_COL; oldMiddle = MIDDLE_COL; oldLeft = LEFT_COL;
-            MIDDLE_COL = oldRight;
-            LEFT_COL = oldMiddle;
-            RIGHT_COL = oldLeft;
+
+        if (RIGHTCOL.includes(newPatch)) {
+            translatePatches(LEFTCOL, -30, 0);
+            oldRight = RIGHTCOL; oldMiddle = MIDDLECOL; oldLeft = LEFTCOL;
+            MIDDLECOL = oldRight;
+            LEFTCOL = oldMiddle;
+            RIGHTCOL = oldLeft;
         }
     }
-    else
-    {
-        console.log("ROW CHANGED");
-        if (TOP_ROW.includes(newPatch))
-        {
-            translatePatches(BOTTOM_ROW, 0, 30);
-            oldBottom = BOTTOM_ROW; oldTop = TOP_ROW; oldMiddle = MIDDLE_ROW;
-            MIDDLE_ROW = oldTop;
-            BOTTOM_ROW = oldMiddle;
-            TOP_ROW = oldBottom;
+
+    else {
+        if (TOPROW.includes(newPatch)) {
+            translatePatches(BOTTOMROW, 0, 30);
+            oldBottom = BOTTOMROW; oldTop = TOPROW; oldMiddle = MIDDLEROW;
+            MIDDLEROW = oldTop;
+            BOTTOMROW = oldMiddle;
+            TOPROW = oldBottom;
         }
-        if (BOTTOM_ROW.includes(newPatch))
-        {
-            translatePatches(TOP_ROW, 0, -30);
-            oldBottom = BOTTOM_ROW; oldTop = TOP_ROW; oldMiddle = MIDDLE_ROW;
-            MIDDLE_ROW = oldBottom;
-            TOP_ROW = oldMiddle;
-            BOTTOM_ROW = oldTop;
+
+        if (BOTTOMROW.includes(newPatch)) {
+            translatePatches(TOPROW, 0, -30);
+            oldBottom = BOTTOMROW;
+            oldTop = TOPROW;
+            oldMiddle = MIDDLEROW;
+            MIDDLEROW = oldBottom;
+            TOPROW = oldMiddle;
+            BOTTOMROW = oldTop;
         }
     }
 }
 
-function translatePatches(patchesNum, tx, tz)
-{
-    for (let i = 0; i < patchesNum.length; i++)
-    {
-        start = patch_offset[patchesNum[i]];
-        end = (patchesNum[i] === 8) ? vertices.length: patch_offset[patchesNum[i] + 1];
-        for (let index = start; index < end; index++)
-        {
-            //console.log(vertices[index]);
+function translatePatches(patchesNum, tx, tz) {
+    for (let i = 0; i < patchesNum.length; i++) {
+
+        start = patchOffset[patchesNum[i]];
+        end = (patchesNum[i] === 8) ? vertices.length: patchOffset[patchesNum[i] + 1];
+
+        for (let index = start; index < end; index++) {
             vertices[index][0] += tx;
             vertices[index][2] += tz;
-            //console.log(vertices[index]);
         }
 
-        console.log(patch_boundaries[patchesNum[i]]);
-        patch_boundaries[patchesNum[i]][0] += tx;
-        patch_boundaries[patchesNum[i]][1] += tx;
-        patch_boundaries[patchesNum[i]][2] += tz;
-        patch_boundaries[patchesNum[i]][3] += tz;
-        console.log(patch_boundaries[patchesNum[i]]);
-
+        patchBoundaries[patchesNum[i]][0] += tx;
+        patchBoundaries[patchesNum[i]][1] += tx;
+        patchBoundaries[patchesNum[i]][2] += tz;
+        patchBoundaries[patchesNum[i]][3] += tz;
     }
+
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
     gl.bufferSubData( gl.ARRAY_BUFFER, 0, flatten(vertices));
-
 }
 
+var patchBoundaries = [];
+var patchOffset = []
 
-var patch_boundaries = [];
-var patch_offset = []
+var LEFTCOL = [2, 5, 8];
+var RIGHTCOL = [0, 3, 6];
+var MIDDLECOL = [1, 4, 7];
 
-var LEFT_COL = [2, 5, 8];
-var RIGHT_COL = [0, 3, 6];
-var MIDDLE_COL = [1, 4, 7];
-
-var BOTTOM_ROW = [0, 1, 2];
-var MIDDLE_ROW = [3, 4, 5];
-var TOP_ROW = [6, 7, 8];
-
+var BOTTOMROW = [0, 1, 2];
+var MIDDLEROW = [3, 4, 5];
+var TOPROW = [6, 7, 8];
 
 function makeSmallPatches()
 {
     p1 = [-15, -5, -15, -5];
-    patch_boundaries.push(p1);
+    patchBoundaries.push(p1);
 
     p2 = [-5, 5, -15, -5];
-    patch_boundaries.push(p2);
+    patchBoundaries.push(p2);
 
     p3 = [5, 15, -15, -5];
-    patch_boundaries.push(p3);
+    patchBoundaries.push(p3);
 
     p4 = [-15, -5, -5, 5];
-    patch_boundaries.push(p4);
+    patchBoundaries.push(p4);
 
     p5 = [-5, 5, -5, 5];
-    patch_boundaries.push(p5);
+    patchBoundaries.push(p5);
 
     p6 = [5, 15, -5, 5];
-    patch_boundaries.push(p6);
+    patchBoundaries.push(p6);
 
     p7 = [-15, -5, 5, 15];
-    patch_boundaries.push(p7);
+    patchBoundaries.push(p7);
 
     p8 = [-5, 5, 5, 15];
-    patch_boundaries.push(p8);
+    patchBoundaries.push(p8);
 
     p9 = [5, 15, 5, 15];
-    patch_boundaries.push(p9);
+    patchBoundaries.push(p9);
 
-    for (let i = 0; i < patch_boundaries.length; i++)
+    for (let i = 0; i < patchBoundaries.length; i++)
     {
-        var patch = patch_boundaries[i]
-        patch_offset.push(getPatch(patch[0], patch[1], patch[2], patch[3]));
+        var patch = patchBoundaries[i]
+        patchOffset.push(getPatch(patch[0], patch[1], patch[2], patch[3]));
     }
 
 }
@@ -535,9 +547,9 @@ function currentPatch(currentPos)
     x = currentPos[0];
     z = currentPos[2];
 
-    for (let i = 0; i < patch_boundaries.length; i++)
+    for (let i = 0; i < patchBoundaries.length; i++)
     {
-        var patch = patch_boundaries[i];
+        var patch = patchBoundaries[i];
         x_min = patch[0]; x_max = patch[1];
         z_min = patch[2]; z_max = patch[3];
 
@@ -621,32 +633,40 @@ function getKeyPress(event){
         left = left - speed;
         right = right - speed;
     }
+
     else if (event.code === 'Numpad6' && left < 0 && right < 5){ // right
         left = left + speed;
         right = right + speed;
     }
+
     else if (event.code === 'Numpad8' && ytop < 1.5 && bottom < -2 ){ // up
         ytop = ytop + speed;
         bottom = bottom + speed;
     }
+
     else if (event.code === 'Numpad2' && ytop > -1.5 && bottom > -4){ // down
         ytop = ytop - speed;
         bottom = bottom - speed;
     }
+
     else if (event.code === 'Numpad5' && near > -6 && far > 4 ){ // in
         near = near - speed;
         far = far - speed;
     }
+
     else if (event.code === 'Numpad0' && near < -4 && far < 6){ // far
         near = near + speed;
         far = far + speed;
     }
+
     else if (event.code === 'KeyV'){ // toggle view
         fill = fill + 1;
         colors = setColors();
         gl.bindBuffer(gl.ARRAY_BUFFER, vertexColor);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, flatten(colors));
     }
+
+    //for rotation. updates the rotation angles taking into account limits
     else if (event.code === 'KeyW' || event.code === 'KeyS' ||
              event.code === 'KeyE' || event.code === 'KeyA' ||
              event.code === 'KeyD' || event.code === 'KeyQ' ){
@@ -657,28 +677,33 @@ function getKeyPress(event){
             ourPlane.pitchRotate = 0.5;
             getRotations();
         }
+
         else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)
                 && ourPlane.pitch > -90.5) { //
             ourPlane.pitch -= 0.5;
             ourPlane.pitchRotate = -0.5;
             getRotations();
         }
+
         else if (event.code === 'KeyA' &&  ourPlane.yaw < 89.5 ) {
             ourPlane.yaw += 0.5;
             console.log(ourPlane.yaw);
             ourPlane.yawRotate = 0.5;
             getRotations();
         }
+
         else if (event.code === 'KeyD' && ourPlane.yaw > -90.5 ) {
             ourPlane.yaw -= 0.5;
             ourPlane.yawRotate = -0.5;
             getRotations();
         }
+
         else if (event.code === 'KeyQ' && ourPlane.roll < 89.5 ) {
             ourPlane.roll += 0.5;
             ourPlane.rollRotate = 0.5;
             getRotations();
         }
+
         else if (event.code === 'KeyE' && ourPlane.roll > -90.5 ) {
             ourPlane.roll -= 0.5;
             ourPlane.rollRotate = -0.5;
@@ -686,18 +711,20 @@ function getKeyPress(event){
         }
     }
 
-    else if (event.keyCode === 38){ //
+    else if (event.keyCode === 38){ //increase speed
         ourPlane.speed = Math.min(ourPlane.speed + 0.01, ourPlane.maxSpeed);
     }
-    else if (event.keyCode === 40){ //
+
+    else if (event.keyCode === 40){ //decrease speed
         ourPlane.speed = Math.max(ourPlane.speed - 0.01, ourPlane.minSpeed);
     }
-    else if (event.keyCode === 27) {
-        if (running) running = false;
-        else running = true;
-        console.log(running);
+
+    else if (event.keyCode === 27) { //escape key. pauses simulator
+        if (simulatorRunning) simulatorRunning = false;
+        else simulatorRunning = true;
     }
-    else if (event.code === 'KeyP'){
+
+    else if (event.code === 'KeyP'){ //music
         try {
             ourAudio.tuneAudio();
         }
@@ -707,6 +734,10 @@ function getKeyPress(event){
     }
 }
 
+/*
+triggered when the user stops pressing the key.
+sets the rotating angle for next iteration to 0
+*/
 function getKeyUp(event){
     if (event.code === 'KeyW') this.pitchRotate = 0;
     else if (event.code === 'KeyS') this.pitchRotate = 0;
