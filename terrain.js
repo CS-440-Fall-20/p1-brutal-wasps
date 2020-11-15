@@ -108,7 +108,7 @@ class Sound {
     constructor(src){
         this.sound = document.getElementById("myAudio");
         this.sound.src = src;
-        this.playing = false;
+        this.playing = true;
     }
 
     tuneAudio(){
@@ -276,7 +276,7 @@ function translate(axis){
 function getRotations(){
     upVector = up;
     atVector = subtract(at, eye);
-    perpendicular = cross(upVector, atVector);
+    perpendicular = cross(atVector, upVector);
 
     //rotate around up vector and get new at and perpendicular vectors
     var yawRotation = rotate(ourPlane.yawRotate, upVector);
