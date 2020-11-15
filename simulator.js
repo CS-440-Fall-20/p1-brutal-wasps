@@ -5,6 +5,7 @@ var vertexBuffer;
 var vertexColor;
 var vertexPosition;
 var ourAudio;
+var accAudio;
 var points = [];
 var colors = [];
 var vertices = [];
@@ -249,8 +250,8 @@ inspired from https://www.w3schools.com/graphics/game_sound.asp
 handles the audio. Playing/pausing audio is mapped to key P on the keyboard
 */
 class Sound {
-    constructor(src) {
-        this.sound = document.getElementById("myAudio");
+    constructor(src, element) {
+        this.sound = document.getElementById(element);
         this.sound.src = src;
         this.playing = true;
     }
@@ -277,7 +278,10 @@ window.onload = function init() {
 
     //add sound
     try {
-        ourAudio = new Sound("verysad.mp3");
+        ourAudio = new Sound("verysad.mp3", "myAudio");
+        accAudio = new Sound("accident.mp3", "accAudio");
+        accAudio.sound.autoplay = false;
+        accAudio.playing = false;
     }
     catch(err){
         console.log("music file not available");
@@ -351,9 +355,8 @@ window.onload = function init() {
     animate(0);
 }
 
-//to map the color of the faces
-function mapPoint(P, Q, X, A, B)
-{
+//to map the color of the vertices according to its y value
+function mapPoint(P, Q, X, A, B) {
     var alpha = (((Q-P)*(Q-P) > 0 ) ? (X - P)/(Q - P) : 0);
     var result;
 
@@ -372,16 +375,14 @@ function mapPoint(P, Q, X, A, B)
 }
 
 //helpder function to create shaders
-function createShaderHelper(sourceString, vertex = true)
-{
+function createShaderHelper(sourceString, vertex = true) {
     var shader = ((vertex) ? gl.createShader( gl.VERTEX_SHADER ) : gl.createShader( gl.FRAGMENT_SHADER ));
     gl.shaderSource( shader, sourceString );
     gl.compileShader( shader );
     return shader;
 }
 
-function getPatch(xmin, xmax, zmin, zmax)
-{
+function getPatch(xmin, xmax, zmin, zmax) {
     //length of side of each triangle
     var scl = 0.1;
 
@@ -441,7 +442,7 @@ function getPatch(xmin, xmax, zmin, zmax)
     return verticesStart
 }
 
-function closeToEdge(x, z, xmin, xmax, zmin, zmax, threshold){
+function closeToEdge(x, z, xmin, xmax, zmin, zmax, threshold) {
     var xDiff = 2;
     var zDiff = 2;
 
@@ -478,7 +479,6 @@ function translate(axis){
     }
 
     atRotated = at;
-    upRotated = up;
     eyeRotated = eye;
 }
 
@@ -507,6 +507,7 @@ function getRotations(){
 
     atRotated = add(atVector, eye);
     up = upVector;
+    upRotated = up;
 }
 
 function getNormalAverage(normals)
@@ -538,31 +539,35 @@ function animate(time){
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         translate(atVector);
 
-        if (contrained) {
-            atRotated[1] = atRotatedStored
-            upRotated[1] = upStored;
-            if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5) {
-                contrained = false;
-            }
-        }
+        // if (atRotated[1] > 3.5)
+        //     atRotated[1] = 3.5;
+        // else (atRotated[1] < 2.5)
+        //     atRotated[1] = 2.5;
+        // if (contrained) {
+        //     atRotated[1] = atRotatedStored
+        //     upRotated[1] = upStored;
+        //     if (eyeRotated[1] > 2.5 || eyeRotated[1] < 3.5) {
+        //         contrained = false;
+        //     }
+        // }
 
-        if (eyeRotated[1] < 2.5 && !contrained) {
-            lastEye = eyeRotated[1];
-            eyeRotated[1] = 2.5;
-            atRotatedStored = atRotated[1];
-            upStored = upRotated[1];
-            contrained = true;
-            lastPitch = ourPlane.pitch;
-        }
+        // if (eyeRotated[1] < 2.5 && !contrained) {
+        //     lastEye = eyeRotated[1];
+        //     eyeRotated[1] = 2.5;
+        //     atRotatedStored = atRotated[1];
+        //     upStored = upRotated[1];
+        //     contrained = true;
+        //     lastPitch = ourPlane.pitch;
+        // }
 
-        if (eyeRotated[1] > 3.5 && !contrained) {
-            lastEye = eyeRotated[1];
-            eyeRotated[1] = 3.5;
-            atRotatedStored = atRotated[1];
-            upStored = upRotated[1];
-            contrained = true;
-            lastPitch = ourPlane.pitch;
-        }
+        // if (eyeRotated[1] > 3.5 && !contrained) {
+        //     lastEye = eyeRotated[1];
+        //     eyeRotated[1] = 3.5;
+        //     atRotatedStored = atRotated[1];
+        //     upStored = upRotated[1];
+        //     contrained = true;
+        //     lastPitch = ourPlane.pitch;
+        // }
 
 
         if (currentPatch(atRotated) != cPatch) {
@@ -574,7 +579,15 @@ function animate(time){
             }
         }
 
+<<<<<<< Updated upstream
         
+=======
+
+        /*
+        get transformation matrices corresponding to current coordinates
+        and pass to webgl program.
+        */
+>>>>>>> Stashed changes
         projectionMatrix = ortho(left, right, bottom, ytop, near, far);
         modelViewMatrix = lookAt(eyeRotated, atRotated, upRotated);
         gl.uniformMatrix4fv( modelViewMatrixLoc, false, flatten(modelViewMatrix) );
@@ -768,8 +781,7 @@ var BOTTOMROW = [0, 1, 2];
 var MIDDLEROW = [3, 4, 5];
 var TOPROW = [6, 7, 8];
 
-function makeSmallPatches()
-{
+function makeSmallPatches() {
     p1 = [-15, -5, -15, -5];
     patchBoundaries.push(p1);
 
@@ -986,15 +998,13 @@ function getKeyPress(event){
              event.code === 'KeyE' || event.code === 'KeyA' ||
              event.code === 'KeyD' || event.code === 'KeyQ' ){
 
-        if (event.code === 'KeyW' && (!contrained || eyeRotated[1] === 3.5)
-                && ourPlane.pitch < 89.5) {
+        if (event.code === 'KeyW' && ourPlane.pitch < 89.5) {
             ourPlane.pitch += 0.5;
             ourPlane.pitchRotate = 0.5;
             getRotations();
         }
 
-        else if (event.code === 'KeyS' && (!contrained || eyeRotated[1] === 2.5)
-                && ourPlane.pitch > -90.5) { //
+        else if (event.code === 'KeyS' && ourPlane.pitch > -90.5) { //
             ourPlane.pitch -= 0.5;
             ourPlane.pitchRotate = -0.5;
             getRotations();
@@ -1028,10 +1038,24 @@ function getKeyPress(event){
 
     else if (event.keyCode === 38){ //increase speed
         ourPlane.speed = Math.min(ourPlane.speed + 0.01, ourPlane.maxSpeed);
+        if (ourPlane.speed > ourPlane.maxSpeed/3){
+            if (!accAudio.playing) {
+                accAudio.sound.play();
+                accAudio.playing = true;
+                ourAudio.tuneAudio();
+            }
+        }
     }
 
     else if (event.keyCode === 40){ //decrease speed
         ourPlane.speed = Math.max(ourPlane.speed - 0.01, ourPlane.minSpeed);
+        if (ourPlane.speed < ourPlane.maxSpeed/3){
+            if (accAudio.playing) {
+                accAudio.sound.pause();
+                ourAudio.tuneAudio();
+                accAudio.playing = false;
+            }
+        }
     }
 
     else if (event.keyCode === 27) { //escape key. pauses simulator
