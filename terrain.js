@@ -143,11 +143,14 @@ void main()
 // vertexShader for Phong shading
 var vertexShaderPhong = `
 attribute vec4 vertexPosition;
+attribute vec4 vertexColor;
 attribute vec3 vNormal;
 uniform mat4 projectionMatrix;
 uniform mat4 modelViewMatrix;
 
 varying vec3 normalInterp;
+varying vec3 pos;
+varying vec4 color;
 
 void main()
 {
@@ -161,14 +164,18 @@ void main()
        
     //normalInterp = (modelViewMatrix*NN).xyz;    // assign to 'varying' variable to allow interpolation
     normalInterp = vec3(NN.xyz);
+    pos = -(modelViewMatrix * vertexPosition).xyz;
+
+    color = vertexColor;
 }
 `
 //fragment shader for Phong
 var fragShaderPhong = `
 precision mediump float;
-attribute vec4 vertexPosition;
 
-uniform vec4 ambientLight, diffuseLight, specularLight;
+varying vec3 normalInterp;
+
+uniform vec3 ambientLight, diffuseLight, specularLight;
 uniform vec4 lightPosition;
 
 uniform float shininess;
@@ -176,12 +183,11 @@ uniform float Ka;
 uniform float Kd;
 uniform float Ks;
 
+varying vec3 pos;
 varying vec4 color;
-varying vec3 normalInterp;
 
 void main()
 {
-    vec3 pos = -(modelViewMatrix * vertexPosition).xyz;
     vec3 N = normalize(normalInterp);
 
     vec3 light = lightPosition.xyz;
@@ -200,9 +206,9 @@ void main()
         specular = pow(specAngle, shininess);
       }
 
-      gl_FragColor = vec4(Ka * ambientLight +
-                        Kd * lambertian * diffuseLight +
-                        Ks * specular * specularLight, 1.0);
+    gl_FragColor = color * vec4(Ka * ambientLight.xyz +
+                        Kd * lambertian * diffuseLight.xyz +
+                        Ks * specular * specularLight.xyz, 1.0);
 }
 `
 
@@ -216,8 +222,8 @@ window.onload = function init()
     }
 
     program = gl.createProgram();
-    vertShdr = createShaderHelper(vertexShader, true);
-    fragShdr = createShaderHelper(fragShader, false);
+    vertShdr = createShaderHelper(vertexShaderPhong, true);
+    fragShdr = createShaderHelper(fragShaderPhong, false);
 
     gl.attachShader( program, vertShdr );
     gl.attachShader( program, fragShdr );
@@ -444,18 +450,18 @@ function enablePhongShading(){
         gl.attachShader( program, vertShdr );
         gl.attachShader( program, fragShdr );
 
-        gl.uniform1f(gl.getUniformLocation(program,
-            "ambientLight"), lightAmbient);
-        gl.uniform1f(gl.getUniformLocation(program,
-            "diffuseLight"), lightDiffuse);
-        gl.uniform1f(gl.getUniformLocation(program,
-            "specularLight"), lightSpecular);
+        gl.uniform4fv(gl.getUniformLocation(program,
+            "ambientLight"), flatten(lightAmbient));
+        gl.uniform4fv(gl.getUniformLocation(program,
+            "diffuseLight"), flatten(lightDiffuse));
+        gl.uniform4fv(gl.getUniformLocation(program,
+            "specularLight"), flatten(lightSpecular));
 
-        gl.uniform1f(gl.getUniformLocation(program,
+        gl.uniform1fv(gl.getUniformLocation(program,
             "Ka"), ka);
-        gl.uniform1f(gl.getUniformLocation(program,
+        gl.uniform1fv(gl.getUniformLocation(program,
             "Kd"), kd);
-        gl.uniform1f(gl.getUniformLocation(program,
+        gl.uniform1fv(gl.getUniformLocation(program,
             "Ks"), ks);
     }
 }
