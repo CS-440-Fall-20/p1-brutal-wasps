@@ -173,6 +173,7 @@ void main()
     vec4 position = projectionMatrix * modelViewMatrix * vertexPosition;
     float divideZ = 1.05 + position.z;
     gl_Position = vec4(position.xy/divideZ, position.z, 1);
+    gl_PointSize = 2.0;
     vec4 NN = vec4(vNormal,0);
     // Transform vertex normal into eye coordinates
 
