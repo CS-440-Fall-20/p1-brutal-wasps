@@ -179,6 +179,7 @@ void main()
     normalInterp = vec3(NN.xyz);
     pos = -(modelViewMatrix * vertexPosition).xyz;
     color = vertexColor;
+    gl_PointSize = 2.0;
 }
 `
 //fragment shader for Phong
@@ -409,6 +410,7 @@ function getPatch(xmin, xmax, zmin, zmax)
     }
 
      
+    /*computes face normals to be used later*/
     for (var k = verticesStart; k < vertices.length; k += 3)
     {
         a = vertices[k];
@@ -441,6 +443,8 @@ function getPatch(xmin, xmax, zmin, zmax)
     return verticesStart
 }
 
+
+//function which detects if the given point is close to the edge of the patch
 function closeToEdge(x, z, xmin, xmax, zmin, zmax, threshold){
     var xDiff = 2;
     var zDiff = 2;
@@ -509,6 +513,7 @@ function getRotations(){
     up = upVector;
 }
 
+//computes average normalized normals acc to page 295
 function getNormalAverage(normals)
 {
     var normal = normals[0]
@@ -522,6 +527,8 @@ function getNormalAverage(normals)
     return normalize(normal)
 }
 
+
+//computes normal vector of given 3 vectors
 function getNormal(a, b, c)
 {
     //Anisa recitation code
@@ -599,8 +606,6 @@ function enableAllBuffers(){
     
     modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
     projectionMatrixLoc = gl.getUniformLocation(program, "projectionMatrix");
-
-    
     
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
