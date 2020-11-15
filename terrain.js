@@ -4,6 +4,7 @@ var colorBuffer;
 var vertexBuffer;
 var vertexColor;
 var vertexPosition;
+var ourAudio;
 var points = [];
 var colors = [];
 var points1 = [];
@@ -51,7 +52,7 @@ var speed = 0.05;
 var modelViewMatrixLoc;
 var projectionMatrixLoc;
 var rotationMatrixLoc;
-var fill = 0;
+var fill = 1;
 
 // get key press event listener
 document.addEventListener('keydown', getKeyPress);
@@ -102,6 +103,26 @@ class Plane {
 
 let ourPlane = new Plane(0, 0, 0, 0.1);
 
+//inspired from https://www.w3schools.com/graphics/game_sound.asp
+class Sound {
+    constructor(src){
+        this.sound = document.getElementById("myAudio");
+        this.sound.src = src;
+        this.playing = false;
+    }
+
+    tuneAudio(){
+        if (this.playing){
+            this.playing = false;
+            this.sound.pause();
+        }
+        else{
+            this.sound.play();
+            this.playing = true;
+        }
+    }
+}
+
 window.onload = function init()
 {
     var canvas = document.getElementById( "gl-canvas" );
@@ -109,6 +130,13 @@ window.onload = function init()
     if ( !gl )
 	{
         alert( "WebGL isn't available" );
+    }
+
+    try {
+        ourAudio = new Sound("verysad.mp3");
+    }
+    catch(err){
+        console.log("music file not available");
     }
 
     var program = gl.createProgram();
@@ -359,7 +387,10 @@ function animate(time)
         //gl.bufferData(gl.ARRAY_BUFFER, flatten(colors), gl.STATIC_DRAW);
 
 
-        if (fill % 4 === 0){ // wireframe
+        if (fill % 4 === 0){ // points
+            gl.drawArrays( gl.POINTS, 0, vertices.length );
+        }
+        else if (fill % 4 === 1){ // wireframe
             gl.drawArrays( gl.LINES, 0, vertices.length );
         }
         else if (fill  % 4 > 0){ // shading involved
@@ -422,7 +453,6 @@ function changeOfPatch(oPatch, newPatch)
 
 function translatePatches(patchesNum, tx, tz)
 {
-    console.log(patchesNum);
     for (let i = 0; i < patchesNum.length; i++)
     {
         start = patch_offset[patchesNum[i]];
@@ -542,7 +572,7 @@ function getVertexColor(vertex)
 }
 
 function setColors(){
-    if (fill % 4 === 1){ // flat shading
+    if (fill % 4 === 2){ // flat shading
         for (var k = 0; k < vertices.length; k += 3)
         {
             var r = 0; var g = 0; var b = 0;
@@ -568,10 +598,10 @@ function setColors(){
         }
 
     }
-    else if (fill % 4 === 2){ // smooth shading
+    else if (fill % 4 === 3){ // smooth shading
 
     }
-    else if (fill % 4 == 3){ // Phong shading
+    else if (fill % 4 == 4){ // Phong shading
 
     }
     else
@@ -665,6 +695,14 @@ function getKeyPress(event){
         if (running) running = false;
         else running = true;
         console.log(running);
+    }
+    else if (event.code === 'KeyP'){
+        try {
+            ourAudio.tuneAudio();
+        }
+        catch(err){
+            console.log("music file not available");
+        }
     }
 }
 
